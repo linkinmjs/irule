@@ -95,12 +95,14 @@ func _unhandled_input(event: InputEvent) -> void:
 		rotate_y(-event.relative.x * MOUSE_SENS)
 		head.rotation.x = clampf(head.rotation.x - event.relative.y * MOUSE_SENS, -1.55, 1.55)
 		bow.add_sway(event.relative)
-	elif event.is_action_pressed("interact") and _interact_target != null:
+	elif event.is_action_pressed("interact") and is_instance_valid(_interact_target):
 		_interact_target.interact(self)
 
 
 func _physics_process(delta: float) -> void:
 	if not GameManager.is_gameplay() or Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
+		if is_drawing:
+			_cancel_draw()  # el release del mouse se consume en pausa/UI: no dejar el arco trabado
 		return
 	_update_crouch(delta)
 	_movement(delta)
@@ -184,10 +186,15 @@ func _update_crouch(delta: float) -> void:
 
 
 func _can_stand() -> bool:
-	var from := global_position + Vector3(0.0, CROUCH_HEIGHT, 0.0)
-	var to := global_position + Vector3(0.0, STAND_HEIGHT + 0.05, 0.0)
-	var query := PhysicsRayQueryParameters3D.create(from, to, 1)
-	return get_world_3d().direct_space_state.intersect_ray(query).is_empty()
+	# Rayos en cruz sobre el radio de la cápsula: un solo rayo central no ve
+	# salientes descentrados y Jolt escupe al jugador al pararse dentro.
+	var space := get_world_3d().direct_space_state
+	for offset in [Vector3.ZERO, Vector3(0.3, 0, 0), Vector3(-0.3, 0, 0), Vector3(0, 0, 0.3), Vector3(0, 0, -0.3)]:
+		var from: Vector3 = global_position + offset + Vector3(0.0, CROUCH_HEIGHT, 0.0)
+		var to: Vector3 = global_position + offset + Vector3(0.0, STAND_HEIGHT + 0.05, 0.0)
+		if not space.intersect_ray(PhysicsRayQueryParameters3D.create(from, to, 1)).is_empty():
+			return false
+	return true
 
 
 # ------------------------------------------------------------------ disparo

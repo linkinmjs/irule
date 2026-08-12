@@ -35,6 +35,17 @@ static var _roots: Dictionary = {}
 static var _psx_cache: Dictionary = {}
 
 
+## Libera las instancias cacheadas (GameManager lo llama al salir del juego —
+## sin esto quedan como leaks reportados al cierre y ensucian el conteo de
+## orphan nodes al cazar leaks reales).
+static func clear() -> void:
+	for root in _roots.values():
+		if root != null and is_instance_valid(root):
+			root.free()
+	_roots.clear()
+	_psx_cache.clear()
+
+
 ## Devuelve un wrapper Node3D con la pieza corregida y asentada (base en y=0),
 ## o null si el GLB/pieza no existe. `unique_materials` da materiales propios
 ## (para tintar sin afectar otras piezas — la Puerta lo usa).

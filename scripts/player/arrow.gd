@@ -96,7 +96,9 @@ func _resolve(hit: Dictionary) -> void:
 
 func _orient() -> void:
 	if velocity.length_squared() > 0.01:
-		look_at(global_position + velocity.normalized(), Vector3.UP)
+		var dir := velocity.normalized()
+		# En tiro casi vertical, UP es colineal con la dirección y look_at falla.
+		look_at(global_position + dir, Vector3.UP if absf(dir.y) < 0.99 else Vector3.BACK)
 
 
 ## Clona el visual y lo cuelga del objetivo: la flecha viaja con el zombie (GDD §11.2).

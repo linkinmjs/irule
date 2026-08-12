@@ -49,6 +49,7 @@ var max_hp := BASE_HP
 var hp := BASE_HP
 var speed := 1.7
 var attack_damage := BASE_DAMAGE
+var bounty := 10  # oro al morir (WorldState suma +5 por headshot)
 var is_elite := false
 
 var state: State = State.MARCH
@@ -73,6 +74,7 @@ var _retreat_timer := 0.0
 var _growl_timer := 0.0
 var _stuck_time := 0.0
 var _unstuck_until_ms := 0
+var _knock := Vector3.ZERO  # knockback acumulado — _on_velocity_computed pisaría velocity
 var _dying := false
 
 
@@ -83,6 +85,7 @@ func configure(day: int, elite: bool) -> void:
 	hp = max_hp
 	speed = (1.4 if elite else randf_range(1.5, 1.95))
 	attack_damage = (22.0 if elite else BASE_DAMAGE)
+	bounty = (25 if elite else 10)
 
 
 ## Llamar después de posicionar al goblin en el mundo (guarda el punto de retirada).
@@ -157,8 +160,9 @@ func _march(delta: float) -> void:
 
 
 func _attack(delta: float) -> void:
-	velocity.x = 0.0
-	velocity.z = 0.0
+	velocity.x = _knock.x
+	velocity.z = _knock.z
+	_knock = _knock.lerp(Vector3.ZERO, minf(delta * 8.0, 1.0))
 	if not is_on_floor():
 		velocity.y -= 9.8 * delta
 	move_and_slide()
@@ -210,7 +214,7 @@ func _navigate_towards(target: Vector3, delta: float) -> void:
 		if _stuck_time > 0.7:
 			_stuck_time = 0.0
 			_unstuck_until_ms = Time.get_ticks_msec() + 700
-			velocity += Vector3(randf_range(-1.0, 1.0), 0.0, randf_range(-1.0, 1.0)) * 0.9
+			_knock += Vector3(randf_range(-1.0, 1.0), 0.0, randf_range(-1.0, 1.0)) * 0.9
 	else:
 		_stuck_time = maxf(_stuck_time - delta * 2.0, 0.0)
 
@@ -228,13 +232,14 @@ func _navigate_towards(target: Vector3, delta: float) -> void:
 func _on_velocity_computed(safe_velocity: Vector3) -> void:
 	if _dying:
 		return
-	velocity.x = safe_velocity.x
-	velocity.z = safe_velocity.z
+	velocity.x = safe_velocity.x + _knock.x
+	velocity.z = safe_velocity.z + _knock.z
 	if not is_on_floor():
 		velocity.y -= 9.8 * get_physics_process_delta_time()
 	else:
 		velocity.y = 0.0
 	move_and_slide()
+	_knock = _knock.lerp(Vector3.ZERO, minf(get_physics_process_delta_time() * 8.0, 1.0))
 
 
 func _animate_march(delta: float, current_speed: float) -> void:
@@ -274,7 +279,7 @@ func _play_once(anim_name: String, anim_speed := 1.0) -> void:
 
 func _on_anim_finished(_anim_name: StringName) -> void:
 	if _anim != null and _loop_anim != "" and not _dying:
-		_anim.play(_loop_anim)
+		_play_loop(_loop_anim, 1.0)  # restaura speed_scale (los one-shot lo dejan en 1.25+)
 
 
 # ------------------------------------------------------------------ daño
@@ -292,7 +297,7 @@ func take_arrow_hit(damage: float, headshot: bool, dir: Vector3, _pos: Vector3) 
 		return
 	# Stagger visible: cada flecha se siente aunque no mate (GDD §11.2).
 	_stagger = 0.3
-	velocity += Vector3(dir.x, 0.0, dir.z) * 1.8
+	_knock += Vector3(dir.x, 0.0, dir.z) * 1.8
 	if _model != null:
 		_play_once(ANIM_HITS[randi() % ANIM_HITS.size()], 1.3)
 	else:
@@ -319,7 +324,7 @@ func take_explosion(damage: float, from: Vector3) -> void:
 		_die(false, dir.normalized() * 11.0, "torso", true)
 	else:
 		_stagger = 0.6
-		velocity += dir.normalized() * 4.0
+		_knock += dir.normalized() * 4.0
 
 
 func retreat() -> void:

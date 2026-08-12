@@ -32,6 +32,8 @@ var gold_earned_today := 0
 var door_damage_tonight := 0.0
 
 var _last_hour_int := int(DAY_START_HOUR)
+var _default_day_sph := 25.0
+var _default_night_sph := 55.0
 
 
 func _ready() -> void:
@@ -47,6 +49,10 @@ func _ready() -> void:
 	for arg in args:
 		if arg.begins_with("--night-secs="):
 			night_seconds_per_hour = float(arg.get_slice("=", 1))
+	# Los flags CLI definen los defaults de la sesión; reset() vuelve a ellos
+	# (el reloj rápido del DebugMenu no debe sobrevivir a "Nueva partida").
+	_default_day_sph = day_seconds_per_hour
+	_default_night_sph = night_seconds_per_hour
 	if args.has("--quit-at-freeze"):
 		time_frozen.connect(_debug_quit_after_freeze)
 
@@ -124,6 +130,8 @@ func reset(starting_day := 1, starting_gold := 60) -> void:
 	headshots_tonight = 0
 	gold_earned_today = 0
 	door_damage_tonight = 0.0
+	day_seconds_per_hour = _default_day_sph
+	night_seconds_per_hour = _default_night_sph
 
 
 func _update_phase() -> void:
@@ -148,11 +156,15 @@ func _update_phase() -> void:
 			time_frozen.emit()
 
 
-func _on_enemy_killed(_enemy: Node3D, headshot: bool) -> void:
+func _on_enemy_killed(enemy: Node3D, headshot: bool) -> void:
 	kills_tonight += 1
 	if headshot:
 		headshots_tonight += 1
-	add_gold(15 if headshot else 10)
+	# El botín lo define el enemigo (élites pagan más); el headshot suma un extra.
+	var bounty := 10
+	if "bounty" in enemy:
+		bounty = enemy.bounty
+	add_gold(bounty + (5 if headshot else 0))
 
 
 func _on_door_damaged(_current: float, _maximum: float) -> void:

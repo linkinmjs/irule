@@ -87,7 +87,8 @@ func explode() -> void:
 			continue
 		var other := barrel as PowderBarrel
 		if other.global_position.distance_to(center) <= RADIUS:
-			get_tree().create_timer(CHAIN_DELAY).timeout.connect(func() -> void:
+			# process_always=false: la cadena no explota durante la pausa.
+			get_tree().create_timer(CHAIN_DELAY, false).timeout.connect(func() -> void:
 				if is_instance_valid(other):
 					other.explode())
 

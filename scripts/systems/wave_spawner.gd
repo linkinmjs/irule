@@ -10,13 +10,16 @@ var door: Node3D = null
 var spawn_center := Vector3.ZERO
 
 var _pushes_launched := 0
-var _spawning := false
+var _active_batches := 0  # contador, no bool: los batches se solapan con reloj rápido
 var _night_over_reported := true
 
 
 func _ready() -> void:
 	WorldState.night_started.connect(_on_night_started)
 	WorldState.time_frozen.connect(_on_time_frozen)
+	# Precalienta el FBX del goblin: el primer spawn de la noche no paga el load.
+	if ResourceLoader.exists(Goblin.MODEL_PATH):
+		load(Goblin.MODEL_PATH)
 
 
 func _process(_delta: float) -> void:
@@ -25,7 +28,7 @@ func _process(_delta: float) -> void:
 	if _pushes_launched < PUSH_HOURS.size() and WorldState.hour >= PUSH_HOURS[_pushes_launched]:
 		_launch_push(_pushes_launched)
 		_pushes_launched += 1
-	elif _pushes_launched == PUSH_HOURS.size() and not _spawning and not _night_over_reported:
+	elif _pushes_launched == PUSH_HOURS.size() and _active_batches == 0 and not _night_over_reported:
 		if get_tree().get_nodes_in_group("enemies").is_empty():
 			_night_over_reported = true
 			EventBus.night_cleared.emit()
@@ -48,15 +51,16 @@ func _launch_push(index: int) -> void:
 
 
 func _spawn_batch(count: int, elites: int) -> void:
-	_spawning = true
+	_active_batches += 1
 	for i in count:
 		if not is_inside_tree() or WorldState.phase != WorldState.Phase.NIGHT:
 			break
 		_spawn_goblin(i >= count - elites)
-		await get_tree().create_timer(randf_range(0.7, 1.4)).timeout
+		# process_always=false: el batch respeta la pausa (si no, spawnea en ESC).
+		await get_tree().create_timer(randf_range(0.7, 1.4), false).timeout
 		if not is_inside_tree():
-			return
-	_spawning = false
+			break
+	_active_batches -= 1
 
 
 func _spawn_goblin(elite: bool) -> void:
