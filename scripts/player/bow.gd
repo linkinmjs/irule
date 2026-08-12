@@ -1,0 +1,117 @@
+class_name Bow
+extends Node3D
+## Viewmodel del arco: sway por mouse, bob por velocidad, animación de draw y kick.
+## Placeholder de primitivas — se reemplaza por el modelo con manos (assets-list.md).
+
+const REST_POS := Vector3(0.34, -0.3, -0.62)
+const DRAW_POS := Vector3(0.2, -0.26, -0.5)
+const SWAY_AMOUNT := 0.0009
+const SWAY_RECOVER := 9.0
+const BOB_FREQ := 9.0
+const BOB_AMOUNT := 0.014
+
+var _player: Player
+var _sway := Vector2.ZERO
+var _bob_time := 0.0
+var _draw := 0.0
+var _kick := 0.0
+var _nocked_arrow: Node3D
+
+
+func setup(player: Player) -> void:
+	_player = player
+
+
+func _ready() -> void:
+	position = REST_POS
+	_build_viewmodel()
+
+
+func _process(delta: float) -> void:
+	_sway = _sway.lerp(Vector2.ZERO, minf(delta * SWAY_RECOVER, 1.0))
+	_kick = lerpf(_kick, 0.0, minf(delta * 9.0, 1.0))
+
+	var hspeed := 0.0
+	if _player != null:
+		hspeed = Vector3(_player.velocity.x, 0.0, _player.velocity.z).length()
+	var speed_frac := clampf(hspeed / Player.WALK_SPEED, 0.0, 1.0)
+	if speed_frac > 0.05 and _player.is_on_floor():
+		_bob_time += delta * BOB_FREQ * maxf(speed_frac, 0.4)
+
+	var bob := Vector3(
+		sin(_bob_time) * BOB_AMOUNT * speed_frac,
+		-absf(cos(_bob_time)) * BOB_AMOUNT * 0.8 * speed_frac,
+		0.0
+	)
+	var base := REST_POS.lerp(DRAW_POS, _draw)
+	position = base + bob + Vector3(_sway.x, _sway.y, _kick)
+	rotation.z = _sway.x * 2.0
+	rotation.x = _sway.y * 1.5
+
+	if _nocked_arrow != null:
+		_nocked_arrow.position.z = -0.12 + _draw * 0.2
+		_nocked_arrow.visible = _player == null or _player.arrows > 0
+
+
+func add_sway(mouse_relative: Vector2) -> void:
+	_sway.x = clampf(_sway.x - mouse_relative.x * SWAY_AMOUNT, -0.03, 0.03)
+	_sway.y = clampf(_sway.y + mouse_relative.y * SWAY_AMOUNT, -0.03, 0.03)
+
+
+func set_draw(charge: float) -> void:
+	_draw = charge
+
+
+func on_draw_start() -> void:
+	_draw = 0.0
+
+
+func on_shoot() -> void:
+	_draw = 0.0
+	_kick = 0.09
+
+
+func _build_viewmodel() -> void:
+	var wood := PSXMaterials.wood_dark()
+	# Cuerpo del arco (riser) + palas. El arco curva ALEJÁNDOSE del arquero
+	# (-Z) y las puntas vuelven hacia él: la cuerda queda del lado de la cámara
+	# (+Z). (Fix playtest 2026-08-11: estaba invertido.)
+	_add_box(Vector3(0.03, 0.22, 0.04), Vector3.ZERO, wood)
+	var upper := _add_box(Vector3(0.025, 0.3, 0.03), Vector3(0.0, 0.24, -0.02), wood)
+	upper.rotation.x = 0.35
+	var lower := _add_box(Vector3(0.025, 0.3, 0.03), Vector3(0.0, -0.24, -0.02), wood)
+	lower.rotation.x = -0.35
+	# Cuerda tensada entre las puntas, del lado del arquero.
+	var string_mat := PSXMaterials.cloth()
+	var s1 := _add_box(Vector3(0.006, 0.34, 0.006), Vector3(0.0, 0.19, 0.06), string_mat)
+	s1.rotation.x = -0.3
+	var s2 := _add_box(Vector3(0.006, 0.34, 0.006), Vector3(0.0, -0.19, 0.06), string_mat)
+	s2.rotation.x = 0.3
+	# Flecha nockeada.
+	_nocked_arrow = Node3D.new()
+	add_child(_nocked_arrow)
+	_nocked_arrow.position = Vector3(0.0, 0.0, -0.12)
+	var shaft := MeshInstance3D.new()
+	var shaft_mesh := BoxMesh.new()
+	shaft_mesh.size = Vector3(0.014, 0.014, 0.5)
+	shaft.mesh = shaft_mesh
+	shaft.material_override = PSXMaterials.wood()
+	_nocked_arrow.add_child(shaft)
+	var tip := MeshInstance3D.new()
+	var tip_mesh := BoxMesh.new()
+	tip_mesh.size = Vector3(0.02, 0.02, 0.05)
+	tip.mesh = tip_mesh
+	tip.position = Vector3(0.0, 0.0, -0.27)
+	tip.material_override = PSXMaterials.metal()
+	_nocked_arrow.add_child(tip)
+
+
+func _add_box(size: Vector3, pos: Vector3, mat: Material) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var mesh := BoxMesh.new()
+	mesh.size = size
+	mi.mesh = mesh
+	mi.position = pos
+	mi.material_override = mat
+	add_child(mi)
+	return mi

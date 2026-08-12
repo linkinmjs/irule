@@ -1,0 +1,19 @@
+[remap]
+
+importer="oggvorbisstr"
+type="AudioStreamOggVorbis"
+uid="uid://b3mnkjrevt36y"
+path="res://.godot/imported/Footstep Stone 1.ogg-2cb1f3b4e540947aa22d0fba570c4efd.oggvorbisstr"
+
+[deps]
+
+source_file="res://assets/audio/footsteps/Footstep Stone 1.ogg"
+dest_files=["res://.godot/imported/Footstep Stone 1.ogg-2cb1f3b4e540947aa22d0fba570c4efd.oggvorbisstr"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4

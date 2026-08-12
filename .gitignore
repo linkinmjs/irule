@@ -1,0 +1,9 @@
+# Godot 4+ specific ignores
+.godot/
+/android/
+
+# Packs comprimidos originales (re-descargables de itch.io — ver assets-list.md)
+assets/_raw/
+
+# Artefactos de re-horneado del nivel
+scenes/levels/outpost_01_backup.tscn
