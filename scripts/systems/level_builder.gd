@@ -1,12 +1,16 @@
 class_name LevelBuilder
 extends Node3D
-## Outpost 01 v3 — nivel ampliado (70×72 m, el doble del v2), mismo lenguaje del
-## boceto de Mauri (D11): camino curvo hundido (y=0) en S doble contra el macizo
-## oeste; superficie superior transitable (y=2.5) al este; torre de 2 pisos;
-## la Puerta al sur. Entre los dos brazos de la S queda un ISTMO de meseta con
-## camino a ambos lados — la posición de tiro premium.
+## Outpost 01 v4 — mismo lenguaje del boceto de Mauri (D11): camino curvo
+## hundido (y=0) en S doble contra el macizo oeste; meseta transitable (y=2.5)
+## al este; torre de 2 pisos; la Puerta al sur. Entre los brazos de la S queda
+## un ISTMO de meseta con camino a ambos lados — la posición de tiro premium.
 ##
-## El nivel se puede HORNEAR a escena editable: scripts/tools/bake_level.gd
+## v4: el suelo es Terrain3D (relieve orgánico). La forma viene de
+## OutpostHeightfield (compartida con el generador y el navmesh); los datos
+## viven en res://assets/terrain/outpost_01 y se regeneran con
+## scenes/tools/terrain_gen.tscn.
+##
+## El nivel se puede HORNEAR a escena editable: scenes/tools/bake_runner.tscn
 ## genera scenes/levels/outpost_01.tscn (main.gd la prefiere si existe).
 ## Los markers PlayerStart/SpawnPoint se editan moviéndolos en el editor.
 
@@ -14,34 +18,18 @@ const CELL := 2.0
 const GRID_MIN := Vector2(-36.0, -72.0)  # (x, z) esquina
 const COLS := 35
 const ROWS := 36
-const PATH_HALF_WIDTH := 3.2
-const PLATEAU_Y := 2.5
-const CLIFF_Y := 6.0
+const PLATEAU_Y := OutpostHeightfield.PLATEAU_Y
 const BASE_Y := -0.4
+const TERRAIN_DIR := "res://assets/terrain/outpost_01"
 
-## Centerline del camino, de norte (spawn) a sur (Puerta). (x, z) — z monotónico.
-const WAYPOINTS := [
-	Vector2(-26.0, -69.0),
-	Vector2(-24.0, -61.0),
-	Vector2(-18.0, -54.0),
-	Vector2(-10.0, -48.0),
-	Vector2(-5.0, -41.0),
-	Vector2(-9.0, -34.0),
-	Vector2(-16.0, -28.0),
-	Vector2(-14.0, -20.0),
-	Vector2(-7.0, -15.0),
-	Vector2(0.0, -11.0),
-	Vector2(3.0, -7.0),
-	Vector2(0.0, -1.0),
-]
-
-enum CellType { PATH, PLATEAU, CLIFF }
+enum CellType { PATH, SLOPE, PLATEAU, CLIFF }
 
 var door: TowerDoor
 var spawn_center := Vector3(-26.0, 0.0, -70.2)
 var player_start := Vector3(9.0, 5.95, -13.0)
 
 var _grid: Dictionary = {}  # Vector2i(ix, iz) → CellType
+var _heights: Dictionary = {}  # Vector2i(ix, iz) → altura del terreno en el centro
 
 
 func _ready() -> void:
@@ -62,44 +50,24 @@ func _cell_center(ix: int, iz: int) -> Vector2:
 	return Vector2(GRID_MIN.x + (ix + 0.5) * CELL, GRID_MIN.y + (iz + 0.5) * CELL)
 
 
-## Macizo SIEMPRE al oeste de la centerline: la meseta este queda conexa y los
-## recodos de la S generan el istmo con camino de ambos lados.
+## Clasifica por ALTURA del heightfield (la geometría real del suelo): camino
+## en el fondo, taludes de transición, meseta este y macizo oeste.
 func _classify_grid() -> void:
 	for ix in COLS:
 		for iz in ROWS:
 			var center := _cell_center(ix, iz)
+			var h := OutpostHeightfield.height_at(center.x, center.y)
+			_heights[Vector2i(ix, iz)] = h
 			var cell_type: CellType
-			if _path_distance(center) <= PATH_HALF_WIDTH:
+			if h < 0.7:
 				cell_type = CellType.PATH
-			elif center.x < _center_x_at_z(center.y):
+			elif h < PLATEAU_Y - 0.45:
+				cell_type = CellType.SLOPE
+			elif center.x < OutpostHeightfield.center_x_at_z(center.y):
 				cell_type = CellType.CLIFF
 			else:
 				cell_type = CellType.PLATEAU
 			_grid[Vector2i(ix, iz)] = cell_type
-
-
-func _path_distance(p: Vector2) -> float:
-	var best := INF
-	for i in WAYPOINTS.size() - 1:
-		var a: Vector2 = WAYPOINTS[i]
-		var b: Vector2 = WAYPOINTS[i + 1]
-		var ab := b - a
-		var t := clampf((p - a).dot(ab) / ab.length_squared(), 0.0, 1.0)
-		best = minf(best, p.distance_to(a + ab * t))
-	return best
-
-
-## x de la centerline a un z dado (los waypoints son monotónicos en z).
-func _center_x_at_z(z: float) -> float:
-	if z <= WAYPOINTS[0].y:
-		return WAYPOINTS[0].x
-	for i in WAYPOINTS.size() - 1:
-		var a: Vector2 = WAYPOINTS[i]
-		var b: Vector2 = WAYPOINTS[i + 1]
-		if z >= a.y and z <= b.y:
-			var t := (z - a.y) / maxf(b.y - a.y, 0.001)
-			return lerpf(a.x, b.x, t)
-	return WAYPOINTS[WAYPOINTS.size() - 1].x
 
 
 func _cell_type(ix: int, iz: int) -> CellType:
@@ -108,41 +76,31 @@ func _cell_type(ix: int, iz: int) -> CellType:
 
 # ------------------------------------------------------------------ terreno
 
+## El suelo completo es un Terrain3D; los datos (regiones .res, assets,
+## material) los genera scenes/tools/terrain_gen.tscn en TERRAIN_DIR.
 func _build_terrain() -> void:
-	# Merge por filas: runs consecutivos del mismo tipo → un solo box.
-	for iz in ROWS:
-		var run_start := 0
-		while run_start < COLS:
-			var run_type := _cell_type(run_start, iz)
-			var run_end := run_start
-			while run_end + 1 < COLS and _cell_type(run_end + 1, iz) == run_type:
-				run_end += 1
-			_terrain_box(run_start, run_end, iz, run_type)
-			run_start = run_end + 1
+	var terrain := Terrain3D.new()
+	terrain.name = "Terrain"
+	if ResourceLoader.exists(TERRAIN_DIR + "/material.tres"):
+		terrain.material = load(TERRAIN_DIR + "/material.tres")
+	if ResourceLoader.exists(TERRAIN_DIR + "/assets.tres"):
+		terrain.assets = load(TERRAIN_DIR + "/assets.tres")
+	add_child(terrain)
+	# Después de add_child: los setters de región/colisión solo aplican con los
+	# objetos internos ya inicializados (antes se pierden en silencio).
+	terrain.region_size = Terrain3D.SIZE_64
+	terrain.collision_layer = 1
+	terrain.collision_mask = 0
+	# Colisión completa al cargar: los goblins caminan todo el largo del camino,
+	# lejos del radio de la colisión dinámica.
+	terrain.collision_mode = Terrain3DCollision.FULL_GAME
+	terrain.data_directory = TERRAIN_DIR
 
 
-func _terrain_box(ix0: int, ix1: int, iz: int, cell_type: CellType) -> void:
-	var top := 0.0
-	var mat := "dirt"
-	match cell_type:
-		CellType.PLATEAU:
-			top = PLATEAU_Y
-			mat = "stone_floor"
-		CellType.CLIFF:
-			top = CLIFF_Y
-			mat = "stone_dark"
-	var width := (ix1 - ix0 + 1) * CELL
-	var height := top - BASE_Y
-	var center := Vector3(
-		GRID_MIN.x + ix0 * CELL + width * 0.5,
-		BASE_Y + height * 0.5,
-		GRID_MIN.y + (iz + 0.5) * CELL
-	)
-	_solid_box("T_%d_%d" % [ix0, iz], Vector3(width, height, CELL), center, mat)
-
-
-## Muro bajo (1.05 m) en cada borde meseta→camino: anti-caída sin tapar el tiro
-## en picado (salto 0.75 < 1.05 — D1 sin muros invisibles).
+## Muro bajo (1.05 m) en los bordes de meseta donde el talud cae fuerte:
+## anti-caída sin tapar el tiro en picado (salto 0.75 < 1.05 — D1 sin muros
+## invisibles). Con taludes ya no hay borde neto meseta→camino: el criterio es
+## el desnivel contra la celda vecina.
 func _build_parapets() -> void:
 	var offsets: Array[Vector2i] = [Vector2i(0, -1), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(1, 0)]
 	var count := 0
@@ -150,17 +108,19 @@ func _build_parapets() -> void:
 		for iz in ROWS:
 			if _cell_type(ix, iz) != CellType.PLATEAU:
 				continue
+			var own_h: float = _heights[Vector2i(ix, iz)]
 			var center := _cell_center(ix, iz)
 			for off in offsets:
 				var nx: int = ix + off.x
 				var nz: int = iz + off.y
 				if nx < 0 or nx >= COLS or nz < 0 or nz >= ROWS:
 					continue
-				if _cell_type(nx, nz) != CellType.PATH:
+				var drop: float = own_h - _heights.get(Vector2i(nx, nz), own_h)
+				if drop < 1.0:
 					continue
 				var horizontal: bool = off.y == 0
 				var size := Vector3(0.3, 1.05, CELL) if horizontal else Vector3(CELL, 1.05, 0.3)
-				var pos := Vector3(center.x, PLATEAU_Y + 0.525, center.y)
+				var pos := Vector3(center.x, own_h + 0.525, center.y)
 				if horizontal:
 					pos.x += off.x * (CELL * 0.5 - 0.15)
 				else:
@@ -264,10 +224,10 @@ func _build_props() -> void:
 	var dummy := TrainingDummy.new()
 	dummy.name = "TrainingDummy"
 	add_child(dummy)
-	dummy.position = Vector3(4.0, PLATEAU_Y, -18.0)
+	dummy.position = _ground(4.0, -18.0)
 
 	# Trampas en el camino (D8; anclajes elegibles llegan en M4).
-	var spike_positions := [Vector3(-10.0, 0.0, -48.0), Vector3(0.0, 0.0, -11.0)]
+	var spike_positions := [_ground(-10.0, -48.0), _ground(0.0, -11.0)]
 	for i in spike_positions.size():
 		var spikes := SpikeTrap.new()
 		spikes.name = "SpikeTrap%d" % i
@@ -275,8 +235,8 @@ func _build_props() -> void:
 		spikes.position = spike_positions[i]
 
 	var barrel_positions := [
-		Vector3(-24.3, 0.0, -60.5), Vector3(-17.5, 0.0, -52.3),
-		Vector3(-9.5, 0.0, -33.5), Vector3(2.2, 0.0, -7.5),
+		_ground(-24.3, -60.5), _ground(-17.5, -52.3),
+		_ground(-9.5, -33.5), _ground(2.2, -7.5),
 	]
 	for i in barrel_positions.size():
 		var barrel := PowderBarrel.new()
@@ -284,29 +244,29 @@ func _build_props() -> void:
 		add_child(barrel)
 		barrel.position = barrel_positions[i]
 
-	# Antorchas del camino, pegadas al lado del macizo (oeste).
-	for i in range(1, WAYPOINTS.size() - 1):
-		var wp: Vector2 = WAYPOINTS[i]
-		_torch(Vector3(wp.x - 2.6, 2.6, wp.y), -PI * 0.5)
+	# Antorchas del camino, plantadas en el talud del macizo (oeste).
+	for i in range(1, OutpostHeightfield.WAYPOINTS.size() - 1):
+		var wp: Vector2 = OutpostHeightfield.WAYPOINTS[i]
+		_torch(_ground(wp.x - 4.2, wp.y, 1.7), -PI * 0.5)
 
 	# Deco del pack sobre la meseta y el istmo (falla silencioso sin GLB).
-	_deco("Gargoyle_Var_1", Vector3(4.5, PLATEAU_Y, -2.2), PI)
-	_deco("Obelisk", Vector3(2.5, PLATEAU_Y, -26.0), 0.0)
-	_deco("Obelisk", Vector3(0.0, PLATEAU_Y, -44.0), 0.6)
-	_deco("Spike_Fence_Variant_1", Vector3(-10.5, PLATEAU_Y, -29.0), 0.4)
-	_deco("Spike_Fence_Variant_1", Vector3(-2.0, PLATEAU_Y, -52.0), -0.5)
-	_deco("Lamp_Post", Vector3(6.0, PLATEAU_Y, -8.0), 0.0)
-	_deco("Lamp_Post", Vector3(-2.0, PLATEAU_Y, -35.0), 0.0)
-	_deco("Gravestone_2", Vector3(9.5, PLATEAU_Y, -24.0), 0.5)
-	_deco("Gravestone_2", Vector3(11.0, PLATEAU_Y, -22.6), -0.3)
-	_deco("Gravestone_2", Vector3(0.0, PLATEAU_Y, -57.0), 0.9)
-	_deco("Tower", Vector3(13.5, PLATEAU_Y, -17.5), 0.0)
-	_deco("Stone_Ball_Spiked", Vector3(4.6, PLATEAU_Y, -6.2), 0.0)
-	_brazier(Vector3(0.0, PLATEAU_Y, -20.0))
-	_brazier(Vector3(5.2, PLATEAU_Y, -13.0))
-	_brazier(Vector3(3.0, PLATEAU_Y, -1.8))
-	_brazier(Vector3(-11.5, PLATEAU_Y, -26.0))
-	_brazier(Vector3(-8.0, PLATEAU_Y, -56.0))
+	_deco("Gargoyle_Var_1", _ground(4.5, -2.2), PI)
+	_deco("Obelisk", _ground(2.5, -26.0), 0.0)
+	_deco("Obelisk", _ground(0.0, -44.0), 0.6)
+	_deco("Spike_Fence_Variant_1", _ground(-10.5, -29.0), 0.4)
+	_deco("Spike_Fence_Variant_1", _ground(-2.0, -52.0), -0.5)
+	_deco("Lamp_Post", _ground(6.0, -8.0), 0.0)
+	_deco("Lamp_Post", _ground(-2.0, -35.0), 0.0)
+	_deco("Gravestone_2", _ground(9.5, -24.0), 0.5)
+	_deco("Gravestone_2", _ground(11.0, -22.6), -0.3)
+	_deco("Gravestone_2", _ground(0.0, -57.0), 0.9)
+	_deco("Tower", _ground(13.5, -17.5), 0.0)
+	_deco("Stone_Ball_Spiked", _ground(4.6, -6.2), 0.0)
+	_brazier(_ground(0.0, -20.0))
+	_brazier(_ground(5.2, -13.0))
+	_brazier(_ground(3.0, -1.8))
+	_brazier(_ground(-11.5, -26.0))
+	_brazier(_ground(-8.0, -56.0))
 
 
 # ------------------------------------------------------------------ navegación
@@ -340,12 +300,17 @@ func _vert(index: Dictionary, vertices: PackedVector3Array, x: float, z: float) 
 	if index.has(key):
 		return index[key]
 	var i := vertices.size()
-	vertices.append(Vector3(x, 0.05, z))
+	vertices.append(Vector3(x, OutpostHeightfield.height_at(x, z) + 0.1, z))
 	index[key] = i
 	return i
 
 
 # ------------------------------------------------------------------ helpers
+
+## Punto apoyado sobre el terreno (opcionalmente elevado `lift` m).
+func _ground(x: float, z: float, lift := 0.0) -> Vector3:
+	return Vector3(x, OutpostHeightfield.height_at(x, z) + lift, z)
+
 
 func _solid_box(box_name: String, size: Vector3, center: Vector3, mat_key: String, with_collision := true) -> void:
 	var mi := MeshInstance3D.new()

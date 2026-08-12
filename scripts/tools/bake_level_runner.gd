@@ -41,8 +41,9 @@ func _ready() -> void:
 
 
 ## Los nodos CON script no guardan sus hijos: los reconstruyen en _ready.
+## Terrain3D tampoco: sus hijos son internos y carga todo desde data_directory.
 func _set_owner_recursive(node: Node, scene_root: Node) -> void:
 	for child in node.get_children():
 		child.owner = scene_root
-		if child.get_script() == null:
+		if child.get_script() == null and not child is Terrain3D:
 			_set_owner_recursive(child, scene_root)
