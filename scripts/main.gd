@@ -47,6 +47,7 @@ func _ready() -> void:
 	player.name = "Player"
 	add_child(player)
 	player.global_position = player_start
+	player.respawn_point = player_start
 
 	var spawner := WaveSpawner.new()
 	spawner.name = "WaveSpawner"

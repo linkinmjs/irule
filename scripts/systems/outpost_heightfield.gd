@@ -1,60 +1,69 @@
 class_name OutpostHeightfield
 extends RefCounted
-## Campo de alturas de Outpost 01. La MISMA función la usan el generador de
-## Terrain3D (scenes/tools/terrain_gen.tscn), el navmesh y el apoyo de props en
-## LevelBuilder — el terreno horneado y la lógica de gameplay no pueden
-## desincronizarse.
+## Campo de alturas de Outpost 01 v2 — boceto de islas (2026-08-12):
+## AGUA alrededor (lecho y=-1.5, espejo visual y=-0.5), el camino de los
+## enemigos es un TERRAPLÉN (y=0) en S que serpentea entre dos islas:
+## la isla del jugador (y=2.5, con la torre de vigilancia) y la isla del
+## aliado al norte. El Portón al sur, con su explanada a y=0.
 ##
-## Lenguaje del boceto D11: camino hundido (y=0) en S doble, meseta transitable
-## al este (y=2.5), macizo oeste (y=6) — con taludes y ruido en vez de cortes
-## verticales. Zonas planas garantizadas: pie de torre, boca de spawn y Puerta.
+## La MISMA función la usan el generador de Terrain3D
+## (scenes/tools/terrain_gen.tscn), el navmesh y el apoyo de props en
+## LevelBuilder — el terreno horneado y el gameplay no pueden desincronizarse.
 
+const WATER_BED := -1.5   ## lecho bajo el agua
+const WATER_LEVEL := -0.5 ## espejo de agua visual (WaterPlane)
 const PATH_Y := 0.0
-const PLATEAU_Y := 2.5
-const CLIFF_Y := 6.0
+const ISLAND_Y := 2.5
+const PLATEAU_Y := ISLAND_Y  # alias para el código existente
 const PATH_HALF_WIDTH := 3.2
-const BANK_EAST := 3.6  ## ancho del talud camino→meseta
-const BANK_WEST := 6.0  ## ancho del talud camino→macizo
-const MAX_Y := 7.0  ## tope: el relieve no debe asomar sobre la muralla (y=8)
+const BANK := 3.4         ## talud terraplén → agua
+const MAX_Y := 3.6
 
-## Centerline del camino, de norte (spawn) a sur (Puerta). (x, z) — z monotónico.
+const PLAYER_ISLAND := Vector2(2.0, -20.0)
+const PLAYER_ISLAND_R := 8.0
+const ALLY_ISLAND := Vector2(-8.0, -57.0)
+const ALLY_ISLAND_R := 6.5
+
+## Centerline del camino, de norte (spawn en la niebla) a sur (Portón).
+## (x, z) — z monotónico. Bordea la isla aliada por el este y la del jugador
+## por el oeste, con brecha de agua no saltable (D1 náutico).
 const WAYPOINTS := [
-	Vector2(-26.0, -69.0),
-	Vector2(-24.0, -61.0),
-	Vector2(-18.0, -54.0),
-	Vector2(-10.0, -48.0),
-	Vector2(-5.0, -41.0),
-	Vector2(-9.0, -34.0),
-	Vector2(-16.0, -28.0),
-	Vector2(-14.0, -20.0),
-	Vector2(-7.0, -15.0),
-	Vector2(0.0, -11.0),
-	Vector2(3.0, -7.0),
-	Vector2(0.0, -1.0),
+	Vector2(0.0, -70.0),
+	Vector2(2.0, -64.0),
+	Vector2(1.0, -58.0),
+	Vector2(-3.0, -51.0),
+	Vector2(-9.0, -45.0),
+	Vector2(-14.0, -39.0),
+	Vector2(-16.0, -32.0),
+	Vector2(-14.0, -26.0),
+	Vector2(-13.0, -19.0),
+	Vector2(-11.0, -12.0),
+	Vector2(-8.0, -6.0),
+	Vector2(-6.0, -1.0),
 ]
 
 static var _detail_noise: FastNoiseLite
-static var _relief_noise: FastNoiseLite
 
 
 static func height_at(x: float, z: float) -> float:
 	var p := Vector2(x, z)
 	var d := path_distance(p)
-	var side := x - center_x_at_z(z)  # >0: este (meseta), <0: oeste (macizo)
-	var h_east := lerpf(PATH_Y, PLATEAU_Y,
-		smoothstep(PATH_HALF_WIDTH - 0.6, PATH_HALF_WIDTH + BANK_EAST, d))
-	var h_west := lerpf(PATH_Y, CLIFF_Y,
-		smoothstep(PATH_HALF_WIDTH - 0.6, PATH_HALF_WIDTH + BANK_WEST, d))
-	var h := lerpf(h_west, h_east, smoothstep(-2.0, 2.0, side))
-	# Ondulación fina: casi nula sobre el camino para no ensuciar la navegación.
-	var amp := lerpf(0.05, 0.35, smoothstep(PATH_HALF_WIDTH, PATH_HALF_WIDTH + 3.0, d))
+	# Terraplén del camino que cae al lecho del agua.
+	var h := lerpf(PATH_Y, WATER_BED,
+		smoothstep(PATH_HALF_WIDTH - 0.6, PATH_HALF_WIDTH + BANK, d))
+	# Ondulación fina: casi nula sobre el camino, suave en orillas y lecho.
+	var amp := lerpf(0.04, 0.28, smoothstep(PATH_HALF_WIDTH, PATH_HALF_WIDTH + 4.0, d))
 	h += _detail().get_noise_2d(x, z) * amp
-	# Relieve amplio solo sobre el macizo (se apaga por debajo de la meseta).
-	h += _relief().get_noise_2d(x, z) * smoothstep(PLATEAU_Y + 0.8, CLIFF_Y, h)
-	h = _pad_rect(h, p, Rect2(5.5, -16.5, 7.0, 7.0), PLATEAU_Y, 3.0)  # torre
-	h = _pad_circle(h, p, Vector2(-26.0, -70.2), 3.5, 3.0, PATH_Y)  # spawn
-	h = _pad_rect(h, p, Rect2(-3.0, -6.0, 6.0, 6.5), PATH_Y, 2.5)  # Puerta
-	return minf(h, MAX_Y)
+	# Las islas emergen del agua.
+	h = _pad_circle(h, p, PLAYER_ISLAND, PLAYER_ISLAND_R, 3.5, ISLAND_Y)
+	h = _pad_circle(h, p, ALLY_ISLAND, ALLY_ISLAND_R, 3.0, ISLAND_Y)
+	# Pie de torre plano (dentro de la isla del jugador).
+	h = _pad_rect(h, p, Rect2(-1.5, -23.5, 7.0, 7.0), ISLAND_Y, 2.0)
+	# Explanada del Portón amplia (la cola de ataque necesita superficie seca;
+	# angosta, el RVO tiraba a media horda al agua) y punto de spawn.
+	h = _pad_rect(h, p, Rect2(-13.5, -7.5, 15.0, 8.0), PATH_Y, 2.5)
+	h = _pad_circle(h, p, Vector2(0.0, -70.0), 3.5, 3.0, PATH_Y)
+	return clampf(h, WATER_BED - 0.4, MAX_Y)
 
 
 static func path_distance(p: Vector2) -> float:
@@ -102,12 +111,3 @@ static func _detail() -> FastNoiseLite:
 		_detail_noise.seed = 60517
 		_detail_noise.frequency = 0.06
 	return _detail_noise
-
-
-static func _relief() -> FastNoiseLite:
-	if _relief_noise == null:
-		_relief_noise = FastNoiseLite.new()
-		_relief_noise.noise_type = FastNoiseLite.TYPE_PERLIN
-		_relief_noise.seed = 41207
-		_relief_noise.frequency = 0.025
-	return _relief_noise

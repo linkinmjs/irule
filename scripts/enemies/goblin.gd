@@ -57,6 +57,7 @@ var pieces: Dictionary = {}
 
 var _door: Node3D = null
 var _spawn_position := Vector3.ZERO
+var _attack_offset := Vector3.ZERO  # cola distribuida a lo ancho de la Puerta
 var _agent: NavigationAgent3D
 var _visual: Node3D
 var _size_factor := 0.85
@@ -92,6 +93,7 @@ func configure(day: int, elite: bool) -> void:
 func set_target(door: Node3D) -> void:
 	_door = door
 	_spawn_position = global_position
+	_attack_offset = Vector3(randf_range(-1.5, 1.5), 0.0, randf_range(0.0, 0.8))
 
 
 func _ready() -> void:
@@ -133,6 +135,12 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	if _dying:
 		return
+	# Los goblins no nadan: fuera del terraplén se hunden (evita que la multitud
+	# empujada al agua rodee la muralla en ruinas; y empujarlos al agua con
+	# explosiones es táctica legítima — cuenta el kill).
+	if global_position.y < -0.35:
+		_drown()
+		return
 	_stagger = maxf(_stagger - delta, 0.0)
 	_growl_timer -= delta
 	if _growl_timer <= 0.0 and state != State.RETREAT:
@@ -151,12 +159,16 @@ func _physics_process(delta: float) -> void:
 func _march(delta: float) -> void:
 	if _door == null:
 		return
-	if _door.has_method("get_attack_point") and global_position.distance_to(_door.get_attack_point()) < ATTACK_REACH:
+	var attack_point: Vector3 = _door.get_attack_point() + _attack_offset \
+		if _door.has_method("get_attack_point") else _door.global_position
+	if global_position.distance_to(attack_point) < ATTACK_REACH:
 		state = State.ATTACK
 		_play_loop(ANIM_COMBAT_IDLE, 1.0)
 		return
-	var target: Vector3 = _door.get_attack_point() if _door.has_method("get_attack_point") else _door.global_position
-	_navigate_towards(target, delta)
+	# En la cola final el RVO se apaga: apretujados contra la Puerta, el
+	# avoidance empujaba goblins al agua (move_and_slide los separa igual).
+	_agent.avoidance_enabled = global_position.distance_to(attack_point) > 6.0
+	_navigate_towards(attack_point, delta)
 
 
 func _attack(delta: float) -> void:
@@ -375,6 +387,16 @@ func ragdoll_pieces() -> Array[Dictionary]:
 		result.append({"key": key, "mesh": mi.mesh, "mat": mi.material_override,
 			"xform": mi.global_transform})
 	return result
+
+
+func _drown() -> void:
+	_dying = true
+	EventBus.enemy_killed.emit(self, false)
+	AudioManager.play_3d("goblin_death", global_position, -8.0, 0.2, 0.8)
+	var tween := create_tween()
+	tween.tween_property(self, "position:y", position.y - 0.9, 0.5)
+	tween.parallel().tween_method(_set_dissolve, 1.0, 0.0, 0.5)
+	tween.tween_callback(queue_free)
 
 
 func _dissolve_out() -> void:

@@ -151,28 +151,37 @@ func _build() -> void:
 	_status_label.label_settings = status_settings
 	content.add_child(_status_label)
 
-	_button(content, "Spawn 1 goblin", func() -> void: _spawn_goblins(1, false))
-	_button(content, "Spawn 5 goblins", func() -> void: _spawn_goblins(5, false))
-	_button(content, "Spawn élite", func() -> void: _spawn_goblins(1, true))
-	_button(content, "Matar todos", _kill_all)
-	_button(content, "Saltar a la noche (21:00)", _jump_to_night)
-	_button(content, "Saltar a las 03:00", _jump_to_freeze)
-	_button(content, "Amanecer (día +1)", func() -> void:
+	# Grid de 2 columnas con textos cortos: 13 acciones entran en ~7 filas
+	# (el panel se pasaba de los 360 px del viewport — playtest 2026-08-12).
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 3)
+	grid.add_theme_constant_override("v_separation", 3)
+	content.add_child(grid)
+
+	_button(grid, "Spawn 1", func() -> void: _spawn_goblins(1, false))
+	_button(grid, "Spawn 5", func() -> void: _spawn_goblins(5, false))
+	_button(grid, "Spawn élite", func() -> void: _spawn_goblins(1, true))
+	_button(grid, "Matar todos", _kill_all)
+	_button(grid, "Noche 21:00", _jump_to_night)
+	_button(grid, "Congelar 03:00", _jump_to_freeze)
+	_button(grid, "Amanecer +1", func() -> void:
 		WorldState.advance_day())
-	_button(content, "Reloj rápido on/off", _toggle_fast_clock)
-	_button(content, "+500 oro", func() -> void: WorldState.add_gold(500))
-	_button(content, "Flechas full", func() -> void:
+	_button(grid, "Reloj rápido", _toggle_fast_clock)
+	_button(grid, "+500 oro", func() -> void: WorldState.add_gold(500))
+	_button(grid, "Flechas full", func() -> void:
 		var p := get_tree().get_first_node_in_group("player")
 		if p != null:
 			p.refill_arrows())
-	_button(content, "Reparar Puerta", func() -> void: _door_action(true))
-	_button(content, "Dañar Puerta (-150)", func() -> void: _door_action(false))
-	_button(content, "Post-proceso on/off", _toggle_post)
+	_button(grid, "Reparar Puerta", func() -> void: _door_action(true))
+	_button(grid, "Dañar Puerta", func() -> void: _door_action(false))
+	_button(grid, "Post on/off", _toggle_post)
 
 
 func _button(parent: Node, text: String, action: Callable) -> void:
 	var button := Button.new()
 	button.text = text
-	button.add_theme_font_size_override("font_size", 10)
+	button.add_theme_font_size_override("font_size", 9)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.pressed.connect(action)
 	parent.add_child(button)

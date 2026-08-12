@@ -13,6 +13,7 @@ const TRAPS := "res://assets/quest-defense-assets/Traps.glb"
 ## Escalas calibradas con el dump de AABB globales (scripts/tools/dump_scene_tree.gd).
 const PIECES := {
 	"Gate_Variant_2": [DRACULA, 0.0, 0.55],        # portón 7.1×6.5 → 3.9×3.6 (la Puerta)
+	"Gate_Variant_3": [DRACULA, 0.0, 0.6],         # arco en ruinas (nacimiento del camino)
 	"Door": [DRACULA, 0.0, 1.0],                   # puerta simple 1.7×3.6
 	"Torch_1": [DRACULA, -90.0, 0.32],             # antorcha de pared
 	"Brazier_1": [DRACULA, -90.0, 0.5],            # brasero de piso

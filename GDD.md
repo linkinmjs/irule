@@ -334,6 +334,17 @@ Mapa mínimo: 1 corredor, tu torre, 1 torre vecina NPC.
 > ⚖️ Balance a vigilar: con el camino doble, el primer contacto con la Puerta
 > llega ~1 min después de las 21:00 — más tiempo de tiro (buscado), menos tiempo
 > de golpeo por noche; compensar en M4 (conteos/horarios de empuje).
+>
+> **Rediseño de islas (2026-08-12, boceto v2 — D11 ampliada):** AGUA alrededor;
+> el camino es un terraplén en S entre la isla del ALIADO (norte, con arquero
+> NPC funcional que dispara — preview de M5) y NUESTRA isla (torre de
+> vigilancia). Puente elevado a la plataforma del Portón (machicolación);
+> muralla en ruinas que se hunde en el agua; sin muros perimetrales (niebla +
+> agua limitan). D1 náutico: caer al agua devuelve al jugador a la torre; los
+> goblins NO nadan — se ahogan (kill válido: empujarlos al agua con explosiones
+> es táctica). Crash reportado con Terrain3D → driver D3D12 reemplazado por
+> Vulkan (el recomendado por el plugin). ⚖️ Vigilar: ~9/24 goblins se ahogan
+> solos en el embudo sin defensor; ajustar si molesta en partida real.
 
 **Criterio de éxito de la maqueta:** *"la noche 3 se siente tensa y disparar es rico"* — playtest de 15 minutos, sin explicar nada al tester.
 

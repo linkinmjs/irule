@@ -67,20 +67,19 @@ func _ready() -> void:
 	# Chequeos de humo: alturas conocidas tras el import.
 	print("TERRAIN_GEN region_size=%d regiones=%s" % [rs, terrain.data.get_region_locations()])
 	print("TERRAIN_GEN alturas [%.2f, %.2f] -> %s" % [h_min, h_max, DATA_DIR])
-	print("TERRAIN_GEN torre(9,-13)=%.2f (esperado 2.5)  spawn(-26,-70)=%.2f (esperado 0)  macizo(-30,-40)=%.2f (esperado ~6)" % [
-		terrain.data.get_height(Vector3(9.0, 0.0, -13.0)),
-		terrain.data.get_height(Vector3(-26.0, 0.0, -70.0)),
-		terrain.data.get_height(Vector3(-30.0, 0.0, -40.0)),
+	print("TERRAIN_GEN torre(2,-20)=%.2f (esperado 2.5)  spawn(0,-70)=%.2f (esperado 0)  agua(20,-40)=%.2f (esperado ~-1.5)  aliado(-8,-57)=%.2f (esperado 2.5)" % [
+		terrain.data.get_height(Vector3(2.0, 0.0, -20.0)),
+		terrain.data.get_height(Vector3(0.0, 0.0, -70.0)),
+		terrain.data.get_height(Vector3(20.0, 0.0, -40.0)),
+		terrain.data.get_height(Vector3(-8.0, 0.0, -57.0)),
 	])
 	get_tree().quit()
 
 
-## La meseta transitable se pinta stone_floor; camino, taludes y macizo quedan
-## en auto-shader (dirt plano / stone_dark empinado).
-func _is_plateau_floor(x: float, z: float, h: float) -> bool:
-	if h < OutpostHeightfield.PLATEAU_Y - 0.45 or h > OutpostHeightfield.PLATEAU_Y + 0.9:
-		return false
-	return x > OutpostHeightfield.center_x_at_z(z)
+## El piso de las islas se pinta stone_floor; camino, taludes y lecho del agua
+## quedan en auto-shader (dirt plano / stone_dark empinado).
+func _is_plateau_floor(_x: float, _z: float, h: float) -> bool:
+	return h >= OutpostHeightfield.ISLAND_Y - 0.45 and h <= OutpostHeightfield.ISLAND_Y + 0.9
 
 
 func _load_or_make_material() -> Terrain3DMaterial:

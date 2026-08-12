@@ -51,6 +51,9 @@ var _interact_prompt := ""
 var _step_accum := 0.0
 var _was_on_floor := true
 
+## D1 náutico (boceto de islas): caer al agua o al camino te devuelve acá.
+var respawn_point := Vector3.ZERO
+
 var head: Node3D
 var camera: Camera3D
 var bow: Bow
@@ -110,6 +113,12 @@ func _physics_process(delta: float) -> void:
 	_update_interact_ray()
 	_update_camera_feel(delta)
 	_update_footsteps(delta)
+	# Kill-zone: todo lo transitable legal está a y ≥ 2.3 (islas, puente,
+	# plataforma). Agua y camino devuelven a la torre — D1 sin muros invisibles.
+	if respawn_point != Vector3.ZERO and global_position.y < 0.9:
+		global_position = respawn_point
+		velocity = Vector3.ZERO
+		EventBus.announcement.emit("El agua está helada — mejor no salir de la isla")
 
 
 # ------------------------------------------------------------------ movimiento

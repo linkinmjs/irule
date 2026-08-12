@@ -62,8 +62,9 @@ func _physics_process(delta: float) -> void:
 
 	var query := PhysicsRayQueryParameters3D.create(from, to, HIT_MASK)
 	query.collide_with_areas = true
-	if _shooter != null:
-		query.exclude = [_shooter.get_rid()]
+	# Solo los shooters con cuerpo físico se excluyen (el AllyArcher es Node3D).
+	if _shooter is CollisionObject3D:
+		query.exclude = [(_shooter as CollisionObject3D).get_rid()]
 	var hit := get_world_3d().direct_space_state.intersect_ray(query)
 
 	if hit.is_empty():
