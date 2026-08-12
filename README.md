@@ -9,6 +9,13 @@ Abrir con **Godot 4.7** y dar Play (`F5`). Escena principal: `scenes/main.tscn`.
 El nivel jugable es **`scenes/levels/outpost_01.tscn`** (editable); si no existe,
 se genera por código con `LevelBuilder`.
 
+La imagen interna es 640×360 y se estira a la ventana (escala fraccional).
+Fuente pixel pendiente: extraer `assets/_raw/1Bit_UI_pack_byBatuhan.rar`
+(necesita 7-Zip/WinRAR) y avisar para integrarla al HUD.
+
+**Plugins:** `addons/dialogue_manager` (3.10.1) instalado pero **deshabilitado**
+— se activa en Proyecto → Plugins cuando arranque M5 (negociación).
+
 ## Controles
 
 | Input | Acción |
