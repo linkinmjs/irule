@@ -290,6 +290,17 @@ func _build_props() -> void:
 		var wp: Vector2 = OutpostHeightfield.WAYPOINTS[i]
 		_torch(_ground(wp.x - 2.6, wp.y, 1.7), -PI * 0.5)
 
+	# Teatro de guerra (capa 2 de visibilidad nocturna): braseros GRANDES en
+	# waypoints alternos, borde este — los goblins cruzan charcos de luz.
+	for i in range(1, OutpostHeightfield.WAYPOINTS.size() - 1, 2):
+		var wp: Vector2 = OutpostHeightfield.WAYPOINTS[i]
+		var brazier := TorchLight.new()
+		brazier.piece_name = "Brazier_1"
+		brazier.light_range = 13.0
+		brazier.light_energy_base = 2.4
+		add_child(brazier)
+		brazier.position = _ground(wp.x + 2.5, wp.y)
+
 	# Arco en ruinas en el nacimiento del camino: de ahí emergen, entre la niebla.
 	_deco("Gate_Variant_3", _ground(0.0, -139.3), 0.0)
 

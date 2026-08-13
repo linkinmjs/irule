@@ -11,9 +11,13 @@ const KEYFRAMES := [
 	[8.0, 1.1, Color(1.0, 0.93, 0.76), 0.0, Color(0.42, 0.5, 0.56), Color(0.5, 0.52, 0.52), 0.014, 0.52, 46.0, 28.0],
 	[17.0, 1.0, Color(1.0, 0.88, 0.68), 0.0, Color(0.4, 0.46, 0.52), Color(0.48, 0.48, 0.47), 0.016, 0.46, 44.0, 26.0],
 	[19.8, 0.55, Color(1.0, 0.55, 0.3), 0.05, Color(0.35, 0.22, 0.18), Color(0.33, 0.24, 0.22), 0.024, 0.28, 40.0, 26.0],
-	[21.0, 0.05, Color(0.7, 0.5, 0.45), 0.28, Color(0.05, 0.06, 0.11), Color(0.07, 0.08, 0.13), 0.038, 0.14, 26.0, 18.0],
-	[22.5, 0.0, Color(0.5, 0.5, 0.6), 0.38, Color(0.025, 0.03, 0.06), Color(0.045, 0.055, 0.095), 0.047, 0.1, 21.0, 14.0],
-	[27.0, 0.0, Color(0.5, 0.5, 0.6), 0.38, Color(0.025, 0.03, 0.06), Color(0.045, 0.055, 0.095), 0.05, 0.1, 20.0, 13.0],
+	# Noche "luna de plata" (playtest 2026-08-13: era negro sobre negro): luna
+	# fuerte, ambiente azul legible y NIEBLA AZUL MEDIA — los goblins se
+	# recortan en silueta a contraluz, y los oscuros dejan de colapsar en la
+	# cuantización del post.
+	[21.0, 0.05, Color(0.7, 0.5, 0.45), 0.5, Color(0.09, 0.11, 0.18), Color(0.11, 0.13, 0.2), 0.038, 0.24, 30.0, 20.0],
+	[22.5, 0.0, Color(0.5, 0.5, 0.6), 0.65, Color(0.07, 0.09, 0.15), Color(0.09, 0.11, 0.17), 0.047, 0.27, 26.0, 16.0],
+	[27.0, 0.0, Color(0.5, 0.5, 0.6), 0.65, Color(0.07, 0.09, 0.15), Color(0.09, 0.11, 0.17), 0.05, 0.27, 25.0, 15.0],
 ]
 
 var _sun: DirectionalLight3D
@@ -29,7 +33,7 @@ func _ready() -> void:
 	add_child(_sun)
 
 	_moon = DirectionalLight3D.new()
-	_moon.light_color = Color(0.6, 0.68, 0.9)
+	_moon.light_color = Color(0.72, 0.78, 0.95)  # plata azulada, más clara
 	_moon.rotation_degrees = Vector3(-48.0, 155.0, 0.0)
 	_moon.shadow_enabled = false
 	add_child(_moon)

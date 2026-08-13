@@ -117,6 +117,7 @@ func _ready() -> void:
 
 	_build_body()
 	_build_head_hitbox()
+	_build_eyes()
 
 	_agent = NavigationAgent3D.new()
 	# Avoidance suave: radio chico y pocos vecinos — en el embudo del camino,
@@ -528,6 +529,43 @@ func _piece(parent: Node3D, size: Vector3, pos: Vector3, mat: Material) -> MeshI
 	mi.material_override = mat
 	parent.add_child(mi)
 	return mi
+
+
+static var _eye_textures: Dictionary = {}
+
+
+## Ojos brillantes (capa 3 de visibilidad nocturna, playtest 2026-08-13):
+## billboard unshaded a la altura de la cabeza — dos puntos que se ven venir
+## entre la niebla aunque el cuerpo aún no se distinga. Élite = rojos.
+func _build_eyes() -> void:
+	var eyes := MeshInstance3D.new()
+	var quad := QuadMesh.new()
+	quad.size = Vector2(0.24, 0.1)
+	eyes.mesh = quad
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	mat.albedo_texture = _eye_texture(is_elite)
+	eyes.material_override = mat
+	eyes.position = Vector3(0.0, 1.5 * _size_factor, 0.0)
+	add_child(eyes)
+
+
+static func _eye_texture(elite: bool) -> ImageTexture:
+	var key := "elite" if elite else "normal"
+	if _eye_textures.has(key):
+		return _eye_textures[key]
+	var color := Color(1.0, 0.32, 0.2) if elite else Color(1.0, 0.85, 0.3)
+	var img := Image.create(16, 8, false, Image.FORMAT_RGBA8)
+	for center_x in [4, 12]:
+		for y in range(2, 6):
+			for x in range(center_x - 1, center_x + 2):
+				img.set_pixel(x, y, color)
+	var tex := ImageTexture.create_from_image(img)
+	_eye_textures[key] = tex
+	return tex
 
 
 func _build_head_hitbox() -> void:

@@ -8,6 +8,10 @@ const BASE_ENERGY := 1.4
 
 ## Pieza del pack a usar: "Torch_1" (pared) o "Brazier_1" (piso).
 @export var piece_name := "Torch_1"
+## Alcance y brillo de la luz (los braseros del camino usan valores grandes:
+## son el "teatro de guerra" — capa 2 de visibilidad nocturna).
+@export var light_range := 7.0
+@export var light_energy_base := 1.4
 
 var _light: OmniLight3D
 var _flame: MeshInstance3D
@@ -49,8 +53,8 @@ func _ready() -> void:
 
 	_light = OmniLight3D.new()
 	_light.light_color = Color(1.0, 0.62, 0.3)
-	_light.omni_range = 7.0
-	_light.light_energy = BASE_ENERGY
+	_light.omni_range = light_range
+	_light.light_energy = light_energy_base
 	_light.position = Vector3(0.0, flame_height + 0.1, 0.1)
 	add_child(_light)
 
@@ -59,7 +63,7 @@ func _process(delta: float) -> void:
 	_retarget_in -= delta
 	if _retarget_in <= 0.0:
 		_retarget_in = randf_range(0.09, 0.16)
-		_target_energy = BASE_ENERGY + randf_range(-0.18, 0.22)
+		_target_energy = light_energy_base + randf_range(-0.18, 0.22) * (light_energy_base / BASE_ENERGY)
 	_light.light_energy = lerpf(_light.light_energy, _target_energy, minf(delta * 6.0, 1.0))
-	var flame_scale := 1.0 + (_light.light_energy - BASE_ENERGY) * 0.3
+	var flame_scale := 1.0 + (_light.light_energy - light_energy_base) * 0.3
 	_flame.scale = Vector3.ONE * flame_scale
