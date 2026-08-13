@@ -22,7 +22,12 @@ func _ready() -> void:
 	_mat.set_shader_parameter("fog_fade_range", 35.0)
 	material_override = _mat
 	# El vertex shader lo estira a pantalla completa: desactivar el culling.
-	custom_aabb = AABB(Vector3(-1e9, -1e9, -1e9), Vector3(2e9, 2e9, 2e9))
+	# OJO: un AABB de ±1e9 rompía el frustum culling de forma intermitente
+	# (el "filtro que desaparece al girar" — playtest 2026-08-12): extremos
+	# moderados + sin occlusion + sin sombra.
+	custom_aabb = AABB(Vector3(-2000.0, -2000.0, -2000.0), Vector3(4000.0, 4000.0, 4000.0))
+	ignore_occlusion_culling = true
+	cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	position = Vector3(0.0, 0.0, -0.5)
 
 

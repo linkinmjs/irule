@@ -9,20 +9,22 @@ const SHADER := preload("res://shaders/psx_lit.gdshader")
 static var _cache: Dictionary = {}
 
 
+## Paleta v2 (2026-08-12): tonos más cálidos y saturados — el gris uniforme
+## apagaba el mapa. Piedra arenisca, tierra rojiza, madera rica.
 static func stone() -> ShaderMaterial:
-	return _noise_mat("stone", Color(0.36, 0.37, 0.42), Color(0.5, 0.51, 0.56), 0.12)
+	return _noise_mat("stone", Color(0.42, 0.38, 0.33), Color(0.56, 0.51, 0.44), 0.12)
 
 
 static func stone_dark() -> ShaderMaterial:
-	return _noise_mat("stone_dark", Color(0.2, 0.21, 0.26), Color(0.31, 0.32, 0.38), 0.1)
+	return _noise_mat("stone_dark", Color(0.27, 0.24, 0.22), Color(0.38, 0.34, 0.31), 0.1)
 
 
 static func stone_floor() -> ShaderMaterial:
-	return _noise_mat("stone_floor", Color(0.27, 0.27, 0.31), Color(0.4, 0.4, 0.45), 0.2)
+	return _noise_mat("stone_floor", Color(0.36, 0.33, 0.29), Color(0.48, 0.44, 0.38), 0.2)
 
 
 static func dirt() -> ShaderMaterial:
-	return _noise_mat("dirt", Color(0.24, 0.2, 0.15), Color(0.36, 0.3, 0.22), 0.18)
+	return _noise_mat("dirt", Color(0.33, 0.24, 0.15), Color(0.46, 0.35, 0.22), 0.18)
 
 
 static func wood() -> ShaderMaterial:

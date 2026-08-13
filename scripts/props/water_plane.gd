@@ -8,7 +8,7 @@ var _mat: StandardMaterial3D
 
 func _ready() -> void:
 	var plane := PlaneMesh.new()
-	plane.size = Vector2(220.0, 220.0)
+	plane.size = Vector2(340.0, 340.0)
 	plane.subdivide_width = 24
 	plane.subdivide_depth = 24
 	mesh = plane
@@ -18,8 +18,8 @@ func _ready() -> void:
 	noise.seed = 7040
 	noise.frequency = 0.05
 	var gradient := Gradient.new()
-	gradient.set_color(0, Color(0.03, 0.07, 0.11))
-	gradient.set_color(1, Color(0.08, 0.16, 0.2))
+	gradient.set_color(0, Color(0.05, 0.13, 0.14))
+	gradient.set_color(1, Color(0.12, 0.24, 0.24))
 	var tex := NoiseTexture2D.new()
 	tex.width = 128
 	tex.height = 128

@@ -3,7 +3,9 @@ extends Node3D
 ## Proyectil con caída (D5). Raycast por frame contra el trayecto → sin tunneling.
 ## Al impactar deja el visual clavado en el objetivo (los zombies la llevan puesta).
 
-const GRAVITY := 9.8
+# Balística v2 (docs/design/guia-de-tiro.md): unificada con la gravedad del
+# player (antes 9.8, caía MENOS que el mundo → floaty). Knob "arquero puro": 15.
+const GRAVITY := 13.0
 const LIFETIME := 8.0
 const STICK_TIME := 12.0
 # world | enemies | debris | interactables | head_hitbox | destructibles

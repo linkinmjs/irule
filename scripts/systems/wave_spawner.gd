@@ -4,7 +4,7 @@ extends Node3D
 ## élites en el último empuje desde el día 2. A las 03:00 los vivos se retiran
 ## entre la niebla (GDD §4.1 — congelación).
 
-const PUSH_HOURS := [21.0, 23.0, 25.0]  # 25.0 == 01:00
+const PUSH_HOURS := [21.0, 23.0, 24.5]  # 24.5 == 00:30 (el camino v3 es largo)
 
 var door: Node3D = null
 var spawn_center := Vector3.ZERO

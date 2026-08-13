@@ -17,17 +17,17 @@ extends Node3D
 ## scenes/levels/outpost_01.tscn (main.gd la prefiere si existe).
 
 const CELL := 2.0
-const GRID_MIN := Vector2(-36.0, -72.0)  # (x, z) esquina
-const COLS := 35
-const ROWS := 36
+const GRID_MIN := Vector2(-72.0, -144.0)  # (x, z) esquina — mapa v3: 140×144 m
+const COLS := 70
+const ROWS := 72
 const ISLAND_Y := OutpostHeightfield.ISLAND_Y
 const TERRAIN_DIR := "res://assets/terrain/outpost_01"
 
 enum CellType { WATER, PATH, SLOPE, PLATEAU }
 
 var door: TowerDoor
-var spawn_center := Vector3(0.0, 0.0, -70.0)
-var player_start := Vector3(2.0, 5.95, -20.0)
+var spawn_center := Vector3(0.0, 0.0, -140.0)
+var player_start := Vector3(4.0, 5.95, -30.0)
 
 var _grid: Dictionary = {}  # Vector2i(ix, iz) → CellType
 var _heights: Dictionary = {}
@@ -102,7 +102,7 @@ func _build_water() -> void:
 	var water := WaterPlane.new()
 	water.name = "Water"
 	add_child(water)
-	water.position = Vector3(0.0, OutpostHeightfield.WATER_LEVEL, -36.0)
+	water.position = Vector3(0.0, OutpostHeightfield.WATER_LEVEL, -72.0)
 
 
 # ------------------------------------------------------------------ muralla del Portón
@@ -115,43 +115,43 @@ func _build_gate_wall() -> void:
 	var base := -1.6
 	var wall_height := top - base
 	var wall_y := base + wall_height * 0.5
-	_solid_box("GateWall_W", Vector3(8.0, wall_height, 1.0), Vector3(-12.0, wall_y, 0.5), "stone")
-	_solid_box("GateWall_E", Vector3(8.0, wall_height, 1.0), Vector3(0.0, wall_y, 0.5), "stone")
-	_solid_box("GateWall_Lintel", Vector3(4.0, top - 3.6, 1.0), Vector3(-6.0, 3.6 + (top - 3.6) * 0.5, 0.5), "stone")
+	_solid_box("GateWall_W", Vector3(8.0, wall_height, 1.0), Vector3(-18.0, wall_y, 0.5), "stone")
+	_solid_box("GateWall_E", Vector3(8.0, wall_height, 1.0), Vector3(-6.0, wall_y, 0.5), "stone")
+	_solid_box("GateWall_Lintel", Vector3(4.0, top - 3.6, 1.0), Vector3(-12.0, 3.6 + (top - 3.6) * 0.5, 0.5), "stone")
 
 	door = TowerDoor.new()
 	door.name = "TowerDoor"
 	add_child(door)
-	door.position = Vector3(-6.0, 0.0, -0.2)
+	door.position = Vector3(-12.0, 0.0, -0.2)
 
 	# Plataforma de mantenimiento sobre el Portón (y=2.5): desde acá se repara
 	# y se tira en picado por la machicolación (los goblins pegan debajo).
-	_solid_box("GatePlatform", Vector3(6.0, 0.3, 2.4), Vector3(-6.0, 2.35, -1.9), "stone_floor")
-	_solid_box("GatePlatformRail", Vector3(6.0, 0.5, 0.15), Vector3(-6.0, 2.75, -3.05), "stone_dark")
+	_solid_box("GatePlatform", Vector3(6.0, 0.3, 2.4), Vector3(-12.0, 2.35, -1.9), "stone_floor")
+	_solid_box("GatePlatformRail", Vector3(6.0, 0.5, 0.15), Vector3(-12.0, 2.75, -3.05), "stone_dark")
 
 
 # ------------------------------------------------------------------ torre de vigilancia (nuestra isla)
 
 func _build_tower() -> void:
-	# Planta 5×5 en el centro de la isla: x ∈ [-0.5, 4.5], z ∈ [-22.5, -17.5].
+	# Planta 5×5 en el centro de la isla: x ∈ [1.5, 6.5], z ∈ [-32.5, -27.5].
 	var wall_height := 6.85 - ISLAND_Y
 	var wall_y := ISLAND_Y + wall_height * 0.5
-	_solid_box("TowerN", Vector3(5.0, wall_height, 0.4), Vector3(2.0, wall_y, -22.3), "stone")
-	_solid_box("TowerS", Vector3(5.0, wall_height, 0.4), Vector3(2.0, wall_y, -17.7), "stone")
-	_solid_box("TowerE", Vector3(0.4, wall_height, 4.2), Vector3(4.3, wall_y, -20.0), "stone")
-	_solid_box("TowerW_S", Vector3(0.4, wall_height, 1.7), Vector3(-0.3, wall_y, -21.65), "stone")
-	_solid_box("TowerW_N", Vector3(0.4, wall_height, 1.7), Vector3(-0.3, wall_y, -18.35), "stone")
+	_solid_box("TowerN", Vector3(5.0, wall_height, 0.4), Vector3(4.0, wall_y, -32.3), "stone")
+	_solid_box("TowerS", Vector3(5.0, wall_height, 0.4), Vector3(4.0, wall_y, -27.7), "stone")
+	_solid_box("TowerE", Vector3(0.4, wall_height, 4.2), Vector3(6.3, wall_y, -30.0), "stone")
+	_solid_box("TowerW_S", Vector3(0.4, wall_height, 1.7), Vector3(1.7, wall_y, -31.65), "stone")
+	_solid_box("TowerW_N", Vector3(0.4, wall_height, 1.7), Vector3(1.7, wall_y, -28.35), "stone")
 	var lintel_h := 6.85 - (ISLAND_Y + 2.2)
-	_solid_box("TowerW_Lintel", Vector3(0.4, lintel_h, 1.6), Vector3(-0.3, ISLAND_Y + 2.2 + lintel_h * 0.5, -20.0), "stone")
+	_solid_box("TowerW_Lintel", Vector3(0.4, lintel_h, 1.6), Vector3(1.7, ISLAND_Y + 2.2 + lintel_h * 0.5, -30.0), "stone")
 
-	# Losa del balcón con hueco de escalera (franja este x ∈ [2.9, 4.1]).
-	_solid_box("TowerDeck", Vector3(3.0, 0.4, 4.2), Vector3(1.4, 5.6, -20.0), "stone_floor")
+	# Losa del balcón con hueco de escalera (franja este x ∈ [4.9, 6.1]).
+	_solid_box("TowerDeck", Vector3(3.0, 0.4, 4.2), Vector3(3.4, 5.6, -30.0), "stone_floor")
 
 	# Escalera interior pegada al muro este, de sur (y 2.5) a norte (y 5.8).
 	for i in 8:
 		var step_h := (i + 1) * 0.4125
 		_solid_box("TowerStep%d" % i, Vector3(1.2, step_h, 0.425),
-			Vector3(3.5, ISLAND_Y + step_h * 0.5, -18.7 - (i + 0.5) * 0.425), "stone_dark", false)
+			Vector3(5.5, ISLAND_Y + step_h * 0.5, -28.7 - (i + 0.5) * 0.425), "stone_dark", false)
 	var ramp := StaticBody3D.new()
 	ramp.name = "TowerStairRamp"
 	ramp.collision_layer = 1
@@ -162,27 +162,27 @@ func _build_tower() -> void:
 	ramp_col.shape = ramp_shape
 	ramp.add_child(ramp_col)
 	add_child(ramp)
-	ramp.position = Vector3(3.5, ISLAND_Y + 1.65, -20.4)
+	ramp.position = Vector3(5.5, ISLAND_Y + 1.65, -30.4)
 	ramp.rotation.x = atan2(3.3, 3.4)
 
 	var bed := Bed.new()
 	bed.name = "Bed"
 	add_child(bed)
-	bed.position = Vector3(1.0, ISLAND_Y, -21.4)
+	bed.position = Vector3(3.0, ISLAND_Y, -31.4)
 
 	var crate := ArrowCrate.new()
 	crate.name = "ArrowCrate"
 	add_child(crate)
-	crate.position = Vector3(0.4, ISLAND_Y, -18.4)
+	crate.position = Vector3(2.4, ISLAND_Y, -28.4)
 
 	var crate_deck := ArrowCrate.new()
 	crate_deck.name = "ArrowCrateDeck"
 	add_child(crate_deck)
-	crate_deck.position = Vector3(0.3, 5.8, -18.5)
+	crate_deck.position = Vector3(2.3, 5.8, -28.5)
 
-	_torch(Vector3(-0.05, ISLAND_Y + 2.1, -21.2), PI * 0.5)
-	_deco("Banner_1", Vector3(-0.7, ISLAND_Y + 0.9, -20.0), -PI * 0.5)
-	_brazier(Vector3(1.0, 5.8, -18.3))
+	_torch(Vector3(1.95, ISLAND_Y + 2.1, -31.2), PI * 0.5)
+	_deco("Banner_1", Vector3(1.3, ISLAND_Y + 0.9, -30.0), -PI * 0.5)
+	_brazier(Vector3(3.0, 5.8, -28.3))
 
 
 # ------------------------------------------------------------------ isla aliada
@@ -215,8 +215,8 @@ func _build_ally_island() -> void:
 ## Pasarela elevada (top y=2.5) de nuestra isla a la plataforma del Portón.
 ## Cruza sobre el camino: clearance ~2.2 m, los goblins pasan por debajo.
 func _build_bridge() -> void:
-	var from := Vector2(0.5, -12.3)   # borde sur de la isla
-	var to := Vector2(-5.0, -2.9)     # borde norte de la plataforma
+	var from := Vector2(1.5, -16.5)   # borde sur de la isla
+	var to := Vector2(-10.5, -3.4)    # borde norte de la plataforma
 	var mid := (from + to) * 0.5
 	var span := from.distance_to(to)
 	var yaw := atan2(to.x - from.x, to.y - from.y)
@@ -268,17 +268,17 @@ func _build_props() -> void:
 	var dummy := TrainingDummy.new()
 	dummy.name = "TrainingDummy"
 	add_child(dummy)
-	dummy.position = _ground(6.5, -21.0)
+	dummy.position = _ground(9.0, -31.5)
 
 	# Trampas en el camino (D8; anclajes elegibles llegan en M4).
-	var spike_positions := [_ground(-12.6, -19.5), _ground(-3.0, -51.3)]
+	var spike_positions := [_ground(-27.5, -63.0), _ground(-3.5, -101.0)]
 	for i in spike_positions.size():
 		var spikes := SpikeTrap.new()
 		spikes.name = "SpikeTrap%d" % i
 		add_child(spikes)
 		spikes.position = spike_positions[i]
 
-	var barrel_positions := [_ground(-15.8, -32.0), _ground(-8.5, -44.5)]
+	var barrel_positions := [_ground(-24.3, -75.0), _ground(-19.8, -36.5)]
 	for i in barrel_positions.size():
 		var barrel := PowderBarrel.new()
 		barrel.name = "Barrel%d" % i
@@ -291,19 +291,19 @@ func _build_props() -> void:
 		_torch(_ground(wp.x - 2.6, wp.y, 1.7), -PI * 0.5)
 
 	# Arco en ruinas en el nacimiento del camino: de ahí emergen, entre la niebla.
-	_deco("Gate_Variant_3", _ground(0.0, -69.3), 0.0)
+	_deco("Gate_Variant_3", _ground(0.0, -139.3), 0.0)
 
 	# Deco de las islas y la explanada (falla silencioso sin GLB).
-	_deco("Gargoyle_Var_1", _ground(-2.5, -2.2), PI)
-	_deco("Obelisk", _ground(7.0, -25.0), 0.6)
-	_deco("Lamp_Post", _ground(-3.5, -15.0), 0.0)
-	_deco("Gravestone_2", _ground(7.5, -16.5), 0.5)
-	_deco("Stone_Ball_Spiked", _ground(5.5, -24.0), 0.0)
-	_deco("Spike_Fence_Variant_1", _ground(-10.5, -4.0), 0.3)
-	_deco("Spike_Fence_Variant_1", _ground(-1.5, -4.5), -0.4)
-	_brazier(_ground(6.0, -17.0))
-	_brazier(_ground(-1.5, -23.0))
-	_brazier(_ground(-9.8, -1.5))
+	_deco("Gargoyle_Var_1", _ground(-8.5, -2.2), PI)
+	_deco("Obelisk", _ground(10.0, -36.0), 0.6)
+	_deco("Lamp_Post", _ground(-2.0, -24.0), 0.0)
+	_deco("Gravestone_2", _ground(11.0, -25.5), 0.5)
+	_deco("Stone_Ball_Spiked", _ground(8.0, -35.8), 0.0)
+	_deco("Spike_Fence_Variant_1", _ground(-16.5, -4.5), 0.3)
+	_deco("Spike_Fence_Variant_1", _ground(-7.5, -5.0), -0.4)
+	_brazier(_ground(9.5, -27.0))
+	_brazier(_ground(0.0, -33.5))
+	_brazier(_ground(-16.8, -1.5))
 
 
 # ------------------------------------------------------------------ navegación

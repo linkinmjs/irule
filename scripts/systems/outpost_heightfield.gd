@@ -19,27 +19,29 @@ const PATH_HALF_WIDTH := 3.2
 const BANK := 3.4         ## talud terraplén → agua
 const MAX_Y := 3.6
 
-const PLAYER_ISLAND := Vector2(2.0, -20.0)
-const PLAYER_ISLAND_R := 8.0
-const ALLY_ISLAND := Vector2(-8.0, -57.0)
-const ALLY_ISLAND_R := 6.5
+## Mapa v3 (2026-08-12): ×2 en superficie (140×144 m), isla del jugador más
+## grande (r14 — con lugar para el farming de flores y pájaros del rediseño).
+const PLAYER_ISLAND := Vector2(4.0, -30.0)
+const PLAYER_ISLAND_R := 14.0
+const ALLY_ISLAND := Vector2(-16.0, -114.0)
+const ALLY_ISLAND_R := 9.0
 
 ## Centerline del camino, de norte (spawn en la niebla) a sur (Portón).
 ## (x, z) — z monotónico. Bordea la isla aliada por el este y la del jugador
 ## por el oeste, con brecha de agua no saltable (D1 náutico).
 const WAYPOINTS := [
-	Vector2(0.0, -70.0),
-	Vector2(2.0, -64.0),
-	Vector2(1.0, -58.0),
-	Vector2(-3.0, -51.0),
-	Vector2(-9.0, -45.0),
-	Vector2(-14.0, -39.0),
-	Vector2(-16.0, -32.0),
-	Vector2(-14.0, -26.0),
-	Vector2(-13.0, -19.0),
-	Vector2(-11.0, -12.0),
-	Vector2(-8.0, -6.0),
-	Vector2(-6.0, -1.0),
+	Vector2(0.0, -140.0),
+	Vector2(6.0, -126.0),
+	Vector2(2.0, -114.0),
+	Vector2(-4.0, -100.0),
+	Vector2(-14.0, -88.0),
+	Vector2(-24.0, -76.0),
+	Vector2(-28.0, -62.0),
+	Vector2(-24.0, -50.0),
+	Vector2(-20.0, -36.0),
+	Vector2(-17.0, -22.0),
+	Vector2(-14.0, -10.0),
+	Vector2(-12.0, -2.0),
 ]
 
 static var _detail_noise: FastNoiseLite
@@ -55,14 +57,14 @@ static func height_at(x: float, z: float) -> float:
 	var amp := lerpf(0.04, 0.28, smoothstep(PATH_HALF_WIDTH, PATH_HALF_WIDTH + 4.0, d))
 	h += _detail().get_noise_2d(x, z) * amp
 	# Las islas emergen del agua.
-	h = _pad_circle(h, p, PLAYER_ISLAND, PLAYER_ISLAND_R, 3.5, ISLAND_Y)
+	h = _pad_circle(h, p, PLAYER_ISLAND, PLAYER_ISLAND_R, 4.0, ISLAND_Y)
 	h = _pad_circle(h, p, ALLY_ISLAND, ALLY_ISLAND_R, 3.0, ISLAND_Y)
 	# Pie de torre plano (dentro de la isla del jugador).
-	h = _pad_rect(h, p, Rect2(-1.5, -23.5, 7.0, 7.0), ISLAND_Y, 2.0)
+	h = _pad_rect(h, p, Rect2(0.5, -33.5, 7.0, 7.0), ISLAND_Y, 2.0)
 	# Explanada del Portón amplia (la cola de ataque necesita superficie seca;
 	# angosta, el RVO tiraba a media horda al agua) y punto de spawn.
-	h = _pad_rect(h, p, Rect2(-13.5, -7.5, 15.0, 8.0), PATH_Y, 2.5)
-	h = _pad_circle(h, p, Vector2(0.0, -70.0), 3.5, 3.0, PATH_Y)
+	h = _pad_rect(h, p, Rect2(-19.5, -7.5, 15.0, 8.0), PATH_Y, 2.5)
+	h = _pad_circle(h, p, Vector2(0.0, -140.0), 4.0, 3.0, PATH_Y)
 	return clampf(h, WATER_BED - 0.4, MAX_Y)
 
 

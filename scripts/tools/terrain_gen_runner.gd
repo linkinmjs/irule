@@ -14,8 +14,8 @@ const DATA_DIR := "res://assets/terrain/outpost_01"
 ## hasta pasar las murallas. El área real se expande a múltiplos de región
 ## porque import_images ancla cada rebanada al ORIGEN de su región — la
 ## posición de import debe estar alineada a la grilla de regiones.
-const WORLD_MIN := Vector2(-44.0, -80.0)
-const WORLD_MAX := Vector2(40.0, 8.0)
+const WORLD_MIN := Vector2(-80.0, -152.0)
+const WORLD_MAX := Vector2(76.0, 8.0)
 
 ## Slots de textura: 0/1 los usa el auto-shader (plano/empinado), 2 se pinta
 ## en el control map sobre la meseta.
@@ -97,13 +97,14 @@ func _load_or_make_assets() -> Terrain3DAssets:
 	if ResourceLoader.exists(path):
 		return load(path)
 	var assets := Terrain3DAssets.new()
-	# Misma paleta que PSXMaterials (dirt / stone_dark / stone_floor).
+	# Paleta v2 cálida (2026-08-12): tierra rojiza, roca parda, PASTO en las
+	# islas (el gris uniforme apagaba el mapa; el pasto prepara el farming).
 	assets.set_texture(TEX_DIRT, _texture_asset(TEX_DIRT, "dirt",
-		Color(0.24, 0.2, 0.15), Color(0.36, 0.3, 0.22), 0.18))
+		Color(0.33, 0.24, 0.15), Color(0.46, 0.35, 0.22), 0.18))
 	assets.set_texture(TEX_STONE_DARK, _texture_asset(TEX_STONE_DARK, "stone_dark",
-		Color(0.2, 0.21, 0.26), Color(0.31, 0.32, 0.38), 0.1))
-	assets.set_texture(TEX_STONE_FLOOR, _texture_asset(TEX_STONE_FLOOR, "stone_floor",
-		Color(0.27, 0.27, 0.31), Color(0.4, 0.4, 0.45), 0.2))
+		Color(0.27, 0.24, 0.22), Color(0.38, 0.34, 0.31), 0.1))
+	assets.set_texture(TEX_STONE_FLOOR, _texture_asset(TEX_STONE_FLOOR, "grass",
+		Color(0.19, 0.29, 0.13), Color(0.33, 0.43, 0.2), 0.22))
 	ResourceSaver.save(assets, path)
 	return assets
 

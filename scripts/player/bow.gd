@@ -1,7 +1,14 @@
 class_name Bow
 extends Node3D
 ## Viewmodel del arco: sway por mouse, bob por velocidad, animación de draw y kick.
-## Placeholder de primitivas — se reemplaza por el modelo con manos (assets-list.md).
+## Usa el arco compuesto del pack de armas (FBX en escala cm → MODEL_SCALE);
+## fallback a primitivas si falta. Las manos llegan con el pack de arms.
+
+const MODEL_PATH := "res://assets/models/packs/weapons/bows/compositebow_01.fbx"
+const MODEL_TEXTURE := "res://assets/models/packs/weapons/bows/compositebow_tex.png"
+const MODEL_SCALE := 22.0
+## Orientación del modelo en la mano (ajustar si el arco aparece girado).
+const MODEL_ROT := Vector3(0.0, PI * 0.5, PI * 0.5)
 
 const REST_POS := Vector3(0.34, -0.3, -0.62)
 const DRAW_POS := Vector3(0.2, -0.26, -0.5)
@@ -72,6 +79,41 @@ func on_shoot() -> void:
 
 
 func _build_viewmodel() -> void:
+	if _try_build_model():
+		_build_nocked_arrow()
+		return
+	_build_primitive_bow()
+	_build_nocked_arrow()
+
+
+func _try_build_model() -> bool:
+	if not ResourceLoader.exists(MODEL_PATH):
+		return false
+	var packed: PackedScene = load(MODEL_PATH)
+	if packed == null:
+		return false
+	var model := packed.instantiate() as Node3D
+	add_child(model)
+	model.rotation = MODEL_ROT
+	model.scale = Vector3.ONE * MODEL_SCALE
+	# La textura se asigna a mano (el png fue renombrado y el FBX no la enlaza).
+	var albedo: Texture2D = load(MODEL_TEXTURE) if ResourceLoader.exists(MODEL_TEXTURE) else null
+	for mi in AssetLib.meshes_in(model):
+		if mi.mesh == null:
+			continue
+		for s in mi.mesh.get_surface_count():
+			var psx := ShaderMaterial.new()
+			psx.shader = PSXMaterials.SHADER
+			if albedo != null:
+				psx.set_shader_parameter("albedo_tex", albedo)
+			else:
+				psx.set_shader_parameter("albedo_tex",
+					PSXMaterials.wood_dark().get_shader_parameter("albedo_tex"))
+			mi.set_surface_override_material(s, psx)
+	return true
+
+
+func _build_primitive_bow() -> void:
 	var wood := PSXMaterials.wood_dark()
 	# Cuerpo del arco (riser) + palas. El arco curva ALEJÁNDOSE del arquero
 	# (-Z) y las puntas vuelven hacia él: la cuerda queda del lado de la cámara
@@ -87,7 +129,9 @@ func _build_viewmodel() -> void:
 	s1.rotation.x = -0.3
 	var s2 := _add_box(Vector3(0.006, 0.34, 0.006), Vector3(0.0, -0.19, 0.06), string_mat)
 	s2.rotation.x = 0.3
-	# Flecha nockeada.
+
+
+func _build_nocked_arrow() -> void:
 	_nocked_arrow = Node3D.new()
 	add_child(_nocked_arrow)
 	_nocked_arrow.position = Vector3(0.0, 0.0, -0.12)

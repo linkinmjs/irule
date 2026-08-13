@@ -45,6 +45,8 @@ Registro de decisiones cerradas (para no re-discutirlas sin motivo):
 | D10 | Reparación de la Puerta | La Puerta se repara de día con recursos (oro/materiales) — conecta economía y negociación | 2026-08-11 |
 | D11 | Layout del nivel | Boceto de Mauri: camino curvo **hundido** para enemigos + **superficie superior** transitable por el jugador + torre de 2 pisos; la Puerta al final del camino | 2026-08-11 |
 | D12 | Post-proceso PS1 | Shader screen-space (aportado por Mauri): niebla por profundidad con ruido animado + cuantización + dithering — reemplaza al fog del Environment | 2026-08-11 |
+| D13 | **Solo Arquero** | No hay clases: el personaje ES arquero. Los talentos mejoran atributos de tiro o desbloquean tipos de flecha CRAFTEADOS (poción atada / plumas) con materiales farmeados en la isla (flores/hongos + caza de pájaros). Diseño: docs/design/m4b-solo-arquero.md | 2026-08-12 |
+| D14 | Balística v2 | Gravedad de flecha unificada con el mundo (13.0), draw mínimo "globo" (14 m/s) — más arco = más skill. Guía de tiro: opción en elección (docs/design/guia-de-tiro.md) | 2026-08-12 |
 
 ---
 
@@ -141,6 +143,11 @@ Disponibles para **todas las clases**; el Ingeniero las amplía, no las monopoli
 ---
 
 ## 7. Clases y talentos
+
+> **⚠ SUPERSEDIDO POR D13 (2026-08-12): no hay clases — SOLO ARQUERO.** El árbol
+> pasa a OJO/MANOS/OFICIO con flechas crafteadas y farming (flores/hongos +
+> pájaros) — diseño completo en `docs/design/m4b-solo-arquero.md`. Esta sección
+> se reescribirá al implementar M4b; se conserva como referencia histórica.
 
 Clase elegida al crear al defensor. Cada amanecer otorga **1 punto de talento** (+ extras por desempeño nocturno 🔶). Árbol de 3 ramas por clase. **Los talentos persisten entre puestos (D6)** — tu defensor hace carrera. 🔶 Riesgo a vigilar en playtests: la curva de dificultad de cada puesto tiene que absorber esa acumulación de poder.
 

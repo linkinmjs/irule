@@ -4,7 +4,9 @@ extends SceneTree
 ## Uso: godot --headless -s res://scripts/tools/dump_scene_tree.gd
 
 const PATHS := [
-	"res://assets/models/packs/goblins/GoblinCharacter.fbx",
+	"res://assets/models/packs/weapons/bows/defaultbow_01.fbx",
+	"res://assets/models/packs/weapons/bows/compositebow_01.fbx",
+	"res://assets/models/packs/weapons/arrows/arrow_01.fbx",
 ]
 
 

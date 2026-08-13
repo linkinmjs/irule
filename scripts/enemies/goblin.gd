@@ -84,7 +84,8 @@ func configure(day: int, elite: bool) -> void:
 	var day_mult := 1.0 + (day - 1) * 0.18
 	max_hp = BASE_HP * day_mult * (2.4 if elite else 1.0)
 	hp = max_hp
-	speed = (1.4 if elite else randf_range(1.5, 1.95))
+	# v3: camino ~190 m — más tranco para que el primer contacto no tarde tanto.
+	speed = (1.7 if elite else randf_range(1.85, 2.35))
 	attack_damage = (22.0 if elite else BASE_DAMAGE)
 	bounty = (25 if elite else 10)
 
@@ -256,8 +257,8 @@ func _on_velocity_computed(safe_velocity: Vector3) -> void:
 
 func _animate_march(delta: float, current_speed: float) -> void:
 	if _model != null:
-		var target_anim := ANIM_RUN if speed > 1.75 else ANIM_WALK
-		_play_loop(target_anim, current_speed / 1.5)
+		var target_anim := ANIM_RUN if speed > 2.05 else ANIM_WALK
+		_play_loop(target_anim, current_speed / 1.7)
 		return
 	# Fallback primitivas: bob + brazos con tiempo cuantizado a 12 fps (snap PS1).
 	_anim_time += delta * maxf(current_speed, 0.3) * 2.6
