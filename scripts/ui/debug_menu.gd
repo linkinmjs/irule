@@ -170,9 +170,9 @@ func _build() -> void:
 	_button(grid, "Reloj rápido", _toggle_fast_clock)
 	_button(grid, "+500 oro", func() -> void: WorldState.add_gold(500))
 	_button(grid, "Flechas full", func() -> void:
-		var p := get_tree().get_first_node_in_group("player")
-		if p != null:
-			p.refill_arrows())
+		WorldState.add_ammo(&"normal", 999))
+	_button(grid, "+1 punto talento", func() -> void:
+		Progression.grant_points(1))
 	_button(grid, "Reparar Puerta", func() -> void: _door_action(true))
 	_button(grid, "Dañar Puerta", func() -> void: _door_action(false))
 	_button(grid, "Post on/off", _toggle_post)

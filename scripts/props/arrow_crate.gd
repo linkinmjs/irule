@@ -1,7 +1,7 @@
 class_name ArrowCrate
 extends StaticBody3D
-## Cajón de flechas: repone el carcaj. Gratis en la maqueta; en M4 se conecta
-## a la economía (GDD §6: munición finita que se compra/produce).
+## Cajón de flechas (F2, M4b): VENDE flechas normales con stock diario.
+## Se acabó el refill gratis — la munición es economía (GDD §6).
 
 func _ready() -> void:
 	collision_layer = 1 | 32
@@ -16,13 +16,20 @@ func _ready() -> void:
 
 
 func get_interact_prompt() -> String:
-	return "[E] Reponer flechas"
+	var data := Catalog.arrow_type(&"normal")
+	var stock := int(WorldState.shop_stock.get(&"normal", 0))
+	if stock < data.bundle_size:
+		return "Sin stock hasta mañana"
+	if WorldState.ammo_count(&"normal") >= Progression.stats.quiver_max:
+		return "Carcaj lleno"
+	return "[E] Comprar %d flechas (%d oro) — stock %d" % [data.bundle_size, data.bundle_price, stock]
 
 
-func interact(player: Node) -> void:
-	if player.has_method("refill_arrows"):
-		player.refill_arrows()
+func interact(_player: Node) -> void:
+	if WorldState.try_buy_ammo(&"normal"):
 		AudioManager.play_ui("repair", -8.0)
+	else:
+		AudioManager.play_ui("ui_click", -6.0)
 
 
 func _build_visual() -> void:

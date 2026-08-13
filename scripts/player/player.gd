@@ -8,7 +8,6 @@ extends CharacterBody3D
 # --- Movimiento (afinado a mano; tocar de a un valor y probar) ---
 const WALK_SPEED := 5.2
 const CROUCH_SPEED := 2.6
-const DRAW_SPEED_MULT := 0.55  # tensar el arco te frena, como el AWP en CS
 const GROUND_ACCEL := 70.0
 const FRICTION := 8.0          # proporcional por segundo → frenada en ~0.12 s
 const STOP_SPEED := 1.2
@@ -18,23 +17,10 @@ const JUMP_VELOCITY := 4.4
 const GRAVITY := 13.0
 const MOUSE_SENS := 0.0022
 
-# --- Arco (D5: proyectil con caída) ---
-const MAX_ARROWS := 30
-const DRAW_TIME := 0.65
+# --- Arco (D5/M4b): los números del tiro viven en ArcherStats
+# (Progression.stats) — los talentos los modifican; las BASES son idénticas a
+# las consts históricas validadas, así el gunfeel M1 queda intacto sin talentos.
 const MIN_DRAW := 0.22
-const RENOCK_TIME := 0.35
-# Balística v2 (docs/design/guia-de-tiro.md): min 14 = el tiro sin tensar es un
-# globo cómico (el draw ES el arma); max 42 con g=13 da 3.3 m de caída a 30 m.
-const ARROW_SPEED_MIN := 14.0
-const ARROW_SPEED_MAX := 42.0
-const ARROW_DAMAGE_MIN := 18.0
-const ARROW_DAMAGE_MAX := 55.0
-
-# --- Dispersión en grados (GDD §5.1 + D14 v2: tensar ES la precisión) ---
-const BASE_SPREAD := 0.3
-const MOVE_SPREAD := 3.4
-const AIR_SPREAD := 2.4
-const LOW_DRAW_SPREAD := 7.0  # sin tensar, la flecha sale a cualquier lado
 
 # --- Diana de apuntado (D14 v2, estilo Lucky Shot) ---
 const LOCK_CONE_DEG := 6.0
@@ -46,7 +32,7 @@ const INTERACT_RANGE := 3.2  # llega a la Puerta desde el borde de la meseta
 const STAND_HEIGHT := 1.8
 const CROUCH_HEIGHT := 1.2
 
-var arrows := MAX_ARROWS
+var selected_arrow: StringName = &"normal"  # el ciclado de tipos llega en F4
 var draw_charge := 0.0
 var is_drawing := false
 
@@ -150,7 +136,7 @@ func _movement(delta: float) -> void:
 
 	var max_speed := CROUCH_SPEED if _crouching else WALK_SPEED
 	if is_drawing:
-		max_speed *= DRAW_SPEED_MULT
+		max_speed *= Progression.stats.draw_move_mult  # tensar te frena, como el AWP
 
 	if is_on_floor():
 		_apply_friction(delta)
@@ -231,7 +217,7 @@ func _update_draw(delta: float) -> void:
 	_renock = maxf(_renock - delta, 0.0)
 
 	if Input.is_action_just_pressed("shoot"):
-		if arrows <= 0:
+		if not has_ammo():
 			AudioManager.play_ui("ui_click", -4.0)
 		elif _renock <= 0.0 and not is_drawing:
 			is_drawing = true
@@ -241,7 +227,7 @@ func _update_draw(delta: float) -> void:
 
 	if not is_drawing:
 		return
-	draw_charge = minf(draw_charge + delta / DRAW_TIME, 1.0)
+	draw_charge = minf(draw_charge + delta / Progression.stats.draw_time, 1.0)
 	bow.set_draw(draw_charge)
 	if Input.is_action_just_released("shoot"):
 		if draw_charge >= MIN_DRAW:
@@ -252,10 +238,12 @@ func _update_draw(delta: float) -> void:
 
 func _shoot() -> void:
 	is_drawing = false
-	arrows -= 1
-	EventBus.arrows_changed.emit(arrows, MAX_ARROWS)
+	if not WorldState.try_spend_ammo(selected_arrow):
+		_cancel_draw()
+		return
 
-	var speed := lerpf(ARROW_SPEED_MIN, ARROW_SPEED_MAX, draw_charge)
+	var stats := Progression.stats
+	var speed := lerpf(stats.arrow_speed_min, stats.arrow_speed_max, draw_charge)
 	var spawn_pos := camera.global_position - camera.global_basis.z * 0.45 + camera.global_basis.x * 0.06
 	var dir: Vector3
 	var perfect := false
@@ -273,12 +261,13 @@ func _shoot() -> void:
 	var arrow := Arrow.new()
 	get_tree().current_scene.add_child(arrow)
 	arrow.setup(self, spawn_pos, dir * speed,
-		lerpf(ARROW_DAMAGE_MIN, ARROW_DAMAGE_MAX, draw_charge), draw_charge, perfect)
+		lerpf(stats.arrow_damage_min, stats.arrow_damage_max, draw_charge),
+		draw_charge, perfect, stats.gravity, stats.headshot_bonus)
 
 	AudioManager.play_ui("bow_shoot", -2.0)
 	_punch = -0.02 - draw_charge * 0.022  # view punch sutil (GDD §11.1)
 	bow.on_shoot()
-	_renock = RENOCK_TIME
+	_renock = stats.renock_time
 	draw_charge = 0.0
 	_aim_marker.hide_marker()
 
@@ -302,13 +291,14 @@ func _aim_dir_with_spread() -> Vector3:
 
 
 func current_spread_deg() -> float:
+	var stats := Progression.stats
 	var hspeed := Vector3(velocity.x, 0.0, velocity.z).length()
 	var speed_frac := clampf(hspeed / WALK_SPEED, 0.0, 1.0)
-	var spread := BASE_SPREAD + speed_frac * MOVE_SPREAD
+	var spread := stats.base_spread + speed_frac * stats.move_spread
 	if not is_on_floor():
-		spread += AIR_SPREAD
+		spread += stats.air_spread
 	if is_drawing:
-		spread += (1.0 - draw_charge) * LOW_DRAW_SPREAD
+		spread += (1.0 - draw_charge) * stats.low_draw_spread
 	return spread
 
 
@@ -317,9 +307,8 @@ func get_crosshair_spread() -> float:
 	return 2.0 + current_spread_deg() * 5.0
 
 
-func refill_arrows() -> void:
-	arrows = MAX_ARROWS
-	EventBus.arrows_changed.emit(arrows, MAX_ARROWS)
+func has_ammo() -> bool:
+	return WorldState.ammo_count(selected_arrow) > 0
 
 
 # ------------------------------------------------------------------ feedback
@@ -394,10 +383,11 @@ func _update_aim_marker() -> void:
 		_aim_marker.hide_marker()
 		return
 	var from := camera.global_position
-	var speed := lerpf(ARROW_SPEED_MIN, ARROW_SPEED_MAX, draw_charge)
+	var stats := Progression.stats
+	var speed := lerpf(stats.arrow_speed_min, stats.arrow_speed_max, draw_charge)
 	var predicted := _predicted_head_position(_locked_target, from, speed)
 	var dist := from.distance_to(predicted)
-	var drop := Arrow.GRAVITY * dist * dist / (2.0 * speed * speed)
+	var drop := stats.gravity * dist * dist / (2.0 * speed * speed)
 	var marker_pos := predicted + Vector3.UP * (0.35 + drop)
 	# "Mira dentro de la diana": distancia del rayo de mira al centro, en mundo.
 	var forward := -camera.global_basis.z
@@ -458,7 +448,7 @@ func _ballistic_dir(from: Vector3, to: Vector3, speed: float) -> Vector3:
 	var dx := flat.length()
 	if dx < 0.01:
 		return Vector3.ZERO
-	var g: float = Arrow.GRAVITY
+	var g: float = Progression.stats.gravity
 	var v2 := speed * speed
 	var disc := v2 * v2 - g * (g * dx * dx + 2.0 * dy * v2)
 	if disc < 0.0:

@@ -68,7 +68,7 @@ func _process(delta: float) -> void:
 
 	if _nocked_arrow != null:
 		_nocked_arrow.position.z = -0.12 + _draw * 0.2
-		_nocked_arrow.visible = _player == null or _player.arrows > 0
+		_nocked_arrow.visible = _player == null or _player.has_ammo()
 
 
 func add_sway(mouse_relative: Vector2) -> void:

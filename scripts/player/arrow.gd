@@ -4,7 +4,8 @@ extends Node3D
 ## Al impactar deja el visual clavado en el objetivo (los zombies la llevan puesta).
 
 # Balística v2 (docs/design/guia-de-tiro.md): unificada con la gravedad del
-# player (antes 9.8, caía MENOS que el mundo → floaty). Knob "arquero puro": 15.
+# player. Default para shooters sin stats (AllyArcher); el player pasa la suya
+# desde ArcherStats (los tipos de flecha la multiplican — M4b).
 const GRAVITY := 13.0
 const LIFETIME := 8.0
 const STICK_TIME := 12.0
@@ -20,10 +21,12 @@ var _visual: Node3D
 var _charge := 1.0
 var _perfect := false
 var _start_pos := Vector3.ZERO
+var _gravity := GRAVITY
+var _headshot_bonus := 1.0
 
 
 func setup(shooter: Node3D, from: Vector3, initial_velocity: Vector3, dmg: float,
-		charge := 1.0, perfect := false) -> void:
+		charge := 1.0, perfect := false, gravity := GRAVITY, headshot_bonus := 1.0) -> void:
 	_shooter = shooter
 	global_position = from
 	_start_pos = from
@@ -31,6 +34,8 @@ func setup(shooter: Node3D, from: Vector3, initial_velocity: Vector3, dmg: float
 	damage = dmg
 	_charge = charge
 	_perfect = perfect
+	_gravity = gravity
+	_headshot_bonus = headshot_bonus
 	_orient()
 
 
@@ -65,7 +70,7 @@ func _physics_process(delta: float) -> void:
 		queue_free()
 		return
 
-	velocity.y -= GRAVITY * delta
+	velocity.y -= _gravity * delta
 	var from := global_position
 	var to := from + velocity * delta
 
@@ -96,7 +101,10 @@ func _resolve(hit: Dictionary) -> void:
 	_orient()
 
 	if target != null and target.has_method("take_arrow_hit"):
-		target.take_arrow_hit(damage, headshot, velocity.normalized(), hit["position"])
+		# El bonus de headshot del arquero (talentos de OJO) es EXTRA al
+		# multiplicador propio del objetivo.
+		var final_damage := damage * (_headshot_bonus if headshot else 1.0)
+		target.take_arrow_hit(final_damage, headshot, velocity.normalized(), hit["position"])
 		_grant_xp(target, headshot, hit["position"])
 		_stick_to(target)
 	else:

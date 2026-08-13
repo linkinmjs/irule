@@ -20,6 +20,7 @@ var _level_label: Label
 var _xp_bar: ProgressBar
 var _xp_float: Label
 var _xp_float_tween: Tween
+var _talent_hint: Label
 
 
 func setup(player: Player) -> void:
@@ -30,8 +31,10 @@ func _ready() -> void:
 	layer = 1
 	_build()
 
-	EventBus.arrows_changed.connect(_on_arrows_changed)
+	WorldState.ammo_changed.connect(_on_ammo_changed)
 	WorldState.gold_changed.connect(_on_gold_changed)
+	Progression.stats_changed.connect(_on_stats_changed)
+	Progression.points_changed.connect(_on_points_changed)
 	EventBus.door_damaged.connect(_on_door_changed)
 	EventBus.door_repaired.connect(_on_door_changed)
 	EventBus.interact_prompt_changed.connect(_on_prompt)
@@ -53,6 +56,8 @@ func _ready() -> void:
 
 	_on_gold_changed(WorldState.gold)
 	_on_xp_changed(WorldState.xp, WorldState.xp_for_next(), WorldState.level)
+	_on_ammo_changed(&"normal", WorldState.ammo_count(&"normal"))
+	_on_points_changed(Progression.points)
 	var door := get_tree().get_first_node_in_group("tower_door")
 	if door != null:
 		_on_door_changed(door.hp, TowerDoor.MAX_HP)
@@ -78,8 +83,20 @@ func _process(_delta: float) -> void:
 
 # ------------------------------------------------------------------ señales
 
-func _on_arrows_changed(arrows: int, max_arrows: int) -> void:
-	_arrows_label.text = "FLECHAS %d/%d" % [arrows, max_arrows]
+func _on_ammo_changed(type: StringName, count: int) -> void:
+	if type != &"normal":
+		return  # los tipos especiales entran al HUD en F4
+	_arrows_label.text = "FLECHAS %d/%d" % [count, Progression.stats.quiver_max]
+
+
+## Los talentos cambian balística y carcaj: la guía y el HUD se recalculan.
+func _on_stats_changed() -> void:
+	_crosshair.set_ballistics(Progression.stats.arrow_speed_max, Progression.stats.gravity)
+	_on_ammo_changed(&"normal", WorldState.ammo_count(&"normal"))
+
+
+func _on_points_changed(points: int) -> void:
+	_talent_hint.text = "[T] Talentos (+%d)" % points if points > 0 else ""
 
 
 func _on_gold_changed(gold: int) -> void:
@@ -142,7 +159,7 @@ func _build() -> void:
 
 	_crosshair = CrosshairControl.new()
 	_crosshair.set_anchors_preset(Control.PRESET_CENTER)
-	_crosshair.set_ballistics(Player.ARROW_SPEED_MAX, Arrow.GRAVITY)
+	_crosshair.set_ballistics(Progression.stats.arrow_speed_max, Progression.stats.gravity)
 	root.add_child(_crosshair)
 
 	_day_label = _label(13, Color(0.85, 0.8, 0.7))
@@ -156,6 +173,10 @@ func _build() -> void:
 	_phase_label = _label(11, Color(0.7, 0.66, 0.6))
 	_phase_label.position = Vector2(8, 48)
 	root.add_child(_phase_label)
+
+	_talent_hint = _label(11, Color(0.95, 0.85, 0.5))
+	_talent_hint.position = Vector2(8, 66)
+	root.add_child(_talent_hint)
 
 	# Posiciones absolutas: el viewport es fijo 640×360 (stretch viewport).
 	# No usar anchors_preset + position antes de add_child (offsets contra padre 0).

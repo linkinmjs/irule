@@ -41,20 +41,16 @@ func request_sleep() -> void:
 func confirm_wake() -> void:
 	if state != State.SUMMARY:
 		return
+	# Puntos del amanecer (M4b): 1 + 1 extra si la Puerta terminó la noche
+	# intacta. Capturar ANTES de advance_day (que resetea las stats nocturnas).
+	var bonus := 1 + (1 if WorldState.door_damage_tonight <= 0.0 else 0)
 	WorldState.advance_day()
-	_apply_dawn_rules()
+	Progression.grant_points(bonus)
+	EventBus.announcement.emit("+%d punto%s de talento — [T]" % [bonus, "" if bonus == 1 else "s"])
 	_save_now()
 	state = State.PLAYING
 	get_tree().paused = false
 	state_changed.emit(state)
-
-
-## Reglas de juego del amanecer, separadas del guardado (M4 las reemplaza por
-## producción/economía — GDD §6: la munición dejará de reponerse gratis).
-func _apply_dawn_rules() -> void:
-	var player := get_tree().get_first_node_in_group("player")
-	if player != null:
-		player.refill_arrows()
 
 
 func toggle_pause() -> void:
@@ -99,10 +95,15 @@ func quit_game() -> void:
 ## Solo serializa (las reglas del amanecer viven en _apply_dawn_rules).
 func _save_now() -> void:
 	var data := {
+		"version": 3,
 		"day": WorldState.day,
 		"gold": WorldState.gold,
 		"xp": WorldState.xp,
 		"level": WorldState.level,
+		"talent_points": Progression.points,
+		"talents": Progression.talents.duplicate(),
+		"ammo": WorldState.ammo.duplicate(),
+		"shop_stock": WorldState.shop_stock.duplicate(),
 	}
 	var door := get_tree().get_first_node_in_group("tower_door")
 	if door != null:

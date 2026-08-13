@@ -23,8 +23,7 @@ signal wave_started(wave_index: int, wave_count: int)
 signal night_cleared
 
 # --- Jugador / HUD ---
-@warning_ignore("unused_signal")
-signal arrows_changed(arrows: int, max_arrows: int)
+# (la munición es estado del mundo: WorldState.ammo_changed — F2/M4b)
 @warning_ignore("unused_signal")
 signal interact_prompt_changed(text: String)
 @warning_ignore("unused_signal")

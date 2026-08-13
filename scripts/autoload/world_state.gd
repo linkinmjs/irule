@@ -11,6 +11,7 @@ signal gold_changed(gold: int)
 signal xp_gained(amount: int)
 signal xp_changed(xp: int, next_level_xp: int, level: int)
 signal level_up(level: int)
+signal ammo_changed(type: StringName, count: int)
 
 enum Phase { DAY, DUSK, NIGHT, FROZEN }
 
@@ -29,6 +30,11 @@ var phase: Phase = Phase.DAY
 var gold := 60
 var xp := 0
 var level := 1
+
+# Munición por tipo (F2, M4b): recurso del mundo, no del player. Sin refill
+# gratis — las normales se COMPRAN en el cajón con stock diario.
+var ammo: Dictionary = {&"normal": 30}
+var shop_stock: Dictionary = {}
 
 # Stats para el pergamino del amanecer (GDD §4.1).
 var kills_tonight := 0
@@ -109,6 +115,49 @@ func try_spend_gold(amount: int) -> bool:
 	return true
 
 
+func ammo_count(type: StringName) -> int:
+	return int(ammo.get(type, 0))
+
+
+func add_ammo(type: StringName, amount: int) -> void:
+	var cap := 999
+	if type == &"normal":
+		cap = Progression.stats.quiver_max
+	ammo[type] = clampi(ammo_count(type) + amount, 0, cap)
+	ammo_changed.emit(type, ammo[type])
+
+
+func try_spend_ammo(type: StringName, amount := 1) -> bool:
+	if ammo_count(type) < amount:
+		return false
+	ammo[type] = ammo_count(type) - amount
+	ammo_changed.emit(type, ammo[type])
+	return true
+
+
+## Compra de un paquete en el cajón (solo tipos con bundle — la normal).
+func try_buy_ammo(type: StringName) -> bool:
+	var data := Catalog.arrow_type(type)
+	if data == null or data.bundle_size <= 0:
+		return false
+	if int(shop_stock.get(type, 0)) < data.bundle_size:
+		return false
+	if ammo_count(type) >= Progression.stats.quiver_max:
+		return false
+	if not try_spend_gold(data.bundle_price):
+		return false
+	shop_stock[type] = int(shop_stock.get(type, 0)) - data.bundle_size
+	add_ammo(type, data.bundle_size)
+	return true
+
+
+func _refresh_shop_stock() -> void:
+	for id in Catalog.arrow_types():
+		var data: ArrowTypeData = Catalog.arrow_types()[id]
+		if data.daily_stock > 0:
+			shop_stock[id] = data.daily_stock
+
+
 ## XP del arquero (D15): la otorgan las flechas al acertar y los kills.
 ## En M4b los niveles alimentarán puntos de talento.
 func xp_for_next() -> int:
@@ -136,6 +185,7 @@ func advance_day() -> void:
 	headshots_tonight = 0
 	gold_earned_today = 0
 	door_damage_tonight = 0.0
+	_refresh_shop_stock()  # el cajón repone su STOCK — las flechas NO (F2)
 	phase = Phase.DAY
 	phase_changed.emit(phase)
 	day_started.emit(day)
@@ -157,6 +207,9 @@ func reset(starting_day := 1, starting_gold := 60) -> void:
 	door_damage_tonight = 0.0
 	day_seconds_per_hour = _default_day_sph
 	night_seconds_per_hour = _default_night_sph
+	ammo = {&"normal": 30}
+	_refresh_shop_stock()
+	ammo_changed.emit(&"normal", 30)
 
 
 func _update_phase() -> void:

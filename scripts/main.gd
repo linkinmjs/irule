@@ -10,8 +10,25 @@ func _ready() -> void:
 	var save := SaveManager.load_game()
 	if save.is_empty():
 		WorldState.reset()
+		Progression.reset()
 	else:
 		WorldState.reset(int(save.get("day", 1)), int(save.get("gold", 60)))
+		WorldState.xp = int(save.get("xp", 0))
+		WorldState.level = int(save.get("level", 1))
+		Progression.from_dict({
+			"points": save.get("talent_points", 1),
+			"talents": save.get("talents", {}),
+		})
+		var saved_ammo: Dictionary = save.get("ammo", {})
+		if not saved_ammo.is_empty():
+			WorldState.ammo.clear()
+			for key in saved_ammo:
+				WorldState.ammo[StringName(key)] = int(saved_ammo[key])
+		var saved_stock: Dictionary = save.get("shop_stock", {})
+		if not saved_stock.is_empty():
+			WorldState.shop_stock.clear()
+			for key in saved_stock:
+				WorldState.shop_stock[StringName(key)] = int(saved_stock[key])
 		WorldState.xp = int(save.get("xp", 0))
 		WorldState.level = int(save.get("level", 1))
 
@@ -64,6 +81,7 @@ func _ready() -> void:
 	add_child(SummaryScreen.new())
 	add_child(GameOverScreen.new())
 	add_child(PauseMenu.new())
+	add_child(ArcherTableScreen.new())  # después de PauseMenu: consume Esc si está abierta
 	add_child(DebugMenu.new())
 
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
