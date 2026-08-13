@@ -62,6 +62,10 @@ func _ready() -> void:
 
 	terrain.data.import_images([height_img, control_img, null],
 		Vector3(x0, 0.0, z0), 0.0, 1.0)
+	# Recalcular los rangos de altura por región: el frustum culling de los
+	# chunks usa estas cajas — desactualizadas, chunks visibles se descartan
+	# intermitentemente ("cuadrado gris parpadeante en el piso", 2026-08-13).
+	terrain.data.calc_height_range(true)
 	terrain.data.save_directory(DATA_DIR)
 
 	# Chequeos de humo: alturas conocidas tras el import.
