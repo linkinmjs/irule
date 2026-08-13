@@ -56,6 +56,9 @@ var _was_on_floor := true
 ## D1 náutico (boceto de islas): caer al agua o al camino te devuelve acá.
 var respawn_point := Vector3.ZERO
 
+## Telémetro de la escalera de pips (D14): distancia al enemigo apuntado, -1 sin blanco.
+var aimed_enemy_distance := -1.0
+
 var head: Node3D
 var camera: Camera3D
 var bow: Bow
@@ -113,6 +116,7 @@ func _physics_process(delta: float) -> void:
 	_movement(delta)
 	_update_draw(delta)
 	_update_interact_ray()
+	_update_aim_telemetry()
 	_update_camera_feel(delta)
 	_update_footsteps(delta)
 	# Kill-zone: todo lo transitable legal está a y ≥ 2.3 (islas, puente,
@@ -332,6 +336,19 @@ func _update_camera_feel(delta: float) -> void:
 	else:
 		camera.h_offset = 0.0
 		camera.v_offset = 0.0
+
+
+## Distancia al enemigo bajo la mira (solo tensando: es cuando la escalera se ve).
+func _update_aim_telemetry() -> void:
+	if not is_drawing:
+		aimed_enemy_distance = -1.0
+		return
+	var from := camera.global_position
+	var to := from - camera.global_basis.z * 60.0
+	var query := PhysicsRayQueryParameters3D.create(from, to, 4 | 64)  # enemigos + cabezas
+	query.collide_with_areas = true
+	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	aimed_enemy_distance = from.distance_to(hit["position"]) if not hit.is_empty() else -1.0
 
 
 # ------------------------------------------------------------------ interacción

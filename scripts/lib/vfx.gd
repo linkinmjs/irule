@@ -23,6 +23,36 @@ static func dust_puff(parent: Node, pos: Vector3) -> void:
 	_burst(parent, pos, Color(0.5, 0.47, 0.42), Color(0.3, 0.28, 0.26), 10, 2.0, 0.6)
 
 
+## Memoria del tiro (D14): X chunky de 2 s donde impactó la flecha — la mejor
+## guía es tu flecha anterior, walkeás el tiro como artillero.
+static func impact_marker(parent: Node, pos: Vector3, normal: Vector3) -> void:
+	var marker := Node3D.new()
+	parent.add_child(marker)
+	marker.global_position = pos + normal * 0.04
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = Color(0.96, 0.9, 0.72)
+	for angle in [PI * 0.25, -PI * 0.25]:
+		var bar := MeshInstance3D.new()
+		var mesh := BoxMesh.new()
+		mesh.size = Vector3(0.42, 0.05, 0.012)
+		bar.mesh = mesh
+		bar.material_override = mat
+		marker.add_child(bar)
+		bar.rotation.z = angle
+	# La X de cara a la superficie.
+	if absf(normal.dot(Vector3.UP)) < 0.99:
+		marker.look_at(pos + normal, Vector3.UP)
+	else:
+		marker.rotation.x = -PI * 0.5 if normal.y > 0.0 else PI * 0.5
+	var timer := Timer.new()
+	timer.wait_time = 2.0
+	timer.one_shot = true
+	timer.autostart = true
+	marker.add_child(timer)
+	timer.timeout.connect(marker.queue_free)
+
+
 ## Suelta un escombro físico (tablones de la Puerta, etc.) que se disuelve solo.
 static func drop_debris(parent: Node, mesh: Mesh, mat: Material, xform: Transform3D, impulse: Vector3) -> void:
 	var body := RigidBody3D.new()

@@ -93,6 +93,8 @@ func _resolve(hit: Dictionary) -> void:
 		_stick_to(target)
 	else:
 		AudioManager.play_3d("arrow_hit_world", hit["position"], -8.0)
+		# Memoria del tiro (D14): solo los impactos al mundo — corregí desde ahí.
+		VFX.impact_marker(get_tree().current_scene, hit["position"], hit.get("normal", Vector3.UP))
 		_stick_to(target if target is Node3D else get_tree().current_scene)
 	queue_free()
 

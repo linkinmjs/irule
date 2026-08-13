@@ -61,6 +61,8 @@ func _process(_delta: float) -> void:
 			_phase_label.text = "El tiempo se congeló"
 	if _player != null:
 		_crosshair.spread = _player.get_crosshair_spread()
+		_crosshair.draw_charge = _player.draw_charge if _player.is_drawing else 0.0
+		_crosshair.target_distance = _player.aimed_enemy_distance
 
 
 # ------------------------------------------------------------------ señales
@@ -111,6 +113,7 @@ func _build() -> void:
 
 	_crosshair = CrosshairControl.new()
 	_crosshair.set_anchors_preset(Control.PRESET_CENTER)
+	_crosshair.set_ballistics(Player.ARROW_SPEED_MAX, Arrow.GRAVITY)
 	root.add_child(_crosshair)
 
 	_day_label = _label(13, Color(0.85, 0.8, 0.7))
@@ -197,14 +200,34 @@ func _label(font_size: int, color: Color) -> Label:
 # ------------------------------------------------------------------ crosshair
 
 class CrosshairControl extends Control:
-	var spread := 6.0
+	## Escalera de pips (D14, docs/design/guia-de-tiro.md): holdovers exactos
+	## para 15/30/45 m a full draw bajo el centro; el telémetro engrosa el pip
+	## del goblin apuntado. Aparece recién cerca del full draw (alpha cuantizado
+	## PS1). Información, no solución: la puntería sigue siendo tuya.
+	const PIP_DISTANCES := [15.0, 30.0, 45.0]
+	const VIEWPORT_HALF_H := 180.0
+	const FOV_HALF_DEG := 46.0
 
+	var spread := 6.0
+	var draw_charge := 0.0
+	var target_distance := -1.0
+
+	var _pip_offsets: Array[float] = []
 	var _hit_time := 0.0
 	var _hit_lethal := false
 	var _hit_headshot := false
 
 	func _ready() -> void:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	## Recalculable por tipo de flecha (M4b): la emplumada comprime la escalera,
+	## la explosiva la estira.
+	func set_ballistics(speed: float, gravity: float) -> void:
+		_pip_offsets.clear()
+		var px_per_tan := VIEWPORT_HALF_H / tan(deg_to_rad(FOV_HALF_DEG))
+		for d in PIP_DISTANCES:
+			var drop_angle := atan(gravity * d / (2.0 * speed * speed))
+			_pip_offsets.append(px_per_tan * tan(drop_angle))
 
 	func _process(delta: float) -> void:
 		_hit_time = maxf(_hit_time - delta, 0.0)
@@ -224,6 +247,7 @@ class CrosshairControl extends Control:
 		draw_rect(Rect2(-thickness * 0.5, spread, thickness, arm), color)
 		draw_rect(Rect2(-thickness * 0.5, -spread - arm, thickness, arm), color)
 		draw_rect(Rect2(-0.5, -0.5, 1.0, 1.0), color)
+		_draw_pip_ladder()
 		if _hit_time > 0.0:
 			var hit_color := Color(1.0, 0.3, 0.25) if _hit_headshot else Color(1.0, 1.0, 1.0, 0.9)
 			var o := 3.0
@@ -232,3 +256,32 @@ class CrosshairControl extends Control:
 			draw_line(Vector2(-o, o), Vector2(-o - l, o + l), hit_color, 1.0)
 			draw_line(Vector2(o, -o), Vector2(o + l, -o - l), hit_color, 1.0)
 			draw_line(Vector2(-o, -o), Vector2(-o - l, -o - l), hit_color, 1.0)
+
+	func _draw_pip_ladder() -> void:
+		if _pip_offsets.is_empty() or draw_charge < 0.55:
+			return
+		# Fade cuantizado en 3 pasos: nada de alphas suaves modernos.
+		var alpha := floorf(clampf((draw_charge - 0.55) / 0.45, 0.0, 1.0) * 3.0) / 3.0
+		if alpha <= 0.0:
+			return
+		var active := _active_pip()
+		for i in _pip_offsets.size():
+			var y: float = _pip_offsets[i]
+			var is_active := i == active
+			var half_w := 4.5 if is_active else 2.5
+			var th := 2.0 if is_active else 1.0
+			var col := Color(0.98, 0.85, 0.5, alpha) if is_active \
+				else Color(0.9, 0.9, 0.85, alpha * 0.65)
+			draw_rect(Rect2(-half_w, y - th * 0.5, half_w * 2.0, th), col)
+
+	## Pip del goblin apuntado, cuantizado a bandas de ~15 m.
+	func _active_pip() -> int:
+		if target_distance < 7.5:
+			return -1
+		if target_distance < 22.5:
+			return 0
+		if target_distance < 37.5:
+			return 1
+		if target_distance < 55.0:
+			return 2
+		return -1
