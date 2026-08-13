@@ -30,11 +30,17 @@ const ARROW_SPEED_MAX := 42.0
 const ARROW_DAMAGE_MIN := 18.0
 const ARROW_DAMAGE_MAX := 55.0
 
-# --- Dispersión en grados (GDD §5.1: quieto = perfecto) ---
+# --- Dispersión en grados (GDD §5.1 + D14 v2: tensar ES la precisión) ---
 const BASE_SPREAD := 0.3
 const MOVE_SPREAD := 3.4
 const AIR_SPREAD := 2.4
-const LOW_DRAW_SPREAD := 2.2
+const LOW_DRAW_SPREAD := 7.0  # sin tensar, la flecha sale a cualquier lado
+
+# --- Diana de apuntado (D14 v2, estilo Lucky Shot) ---
+const LOCK_CONE_DEG := 6.0
+const LOCK_RANGE := 55.0
+const LOCK_MIN_DRAW := 0.5
+const DIANA_RADIUS := 0.3  # "mira dentro de la diana" en metros de mundo
 
 const INTERACT_RANGE := 3.2  # llega a la Puerta desde el borde de la meseta
 const STAND_HEIGHT := 1.8
@@ -58,6 +64,10 @@ var respawn_point := Vector3.ZERO
 
 ## Telémetro de la escalera de pips (D14): distancia al enemigo apuntado, -1 sin blanco.
 var aimed_enemy_distance := -1.0
+
+var _locked_target: Node3D = null
+var _aim_on_target := false
+var _aim_marker: AimTargetMarker
 
 var head: Node3D
 var camera: Camera3D
@@ -93,6 +103,9 @@ func _ready() -> void:
 	bow = Bow.new()
 	bow.setup(self)
 	camera.add_child(bow)
+
+	_aim_marker = AimTargetMarker.new()
+	add_child(_aim_marker)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -242,21 +255,31 @@ func _shoot() -> void:
 	arrows -= 1
 	EventBus.arrows_changed.emit(arrows, MAX_ARROWS)
 
-	var dir := _aim_dir_with_spread()
+	var speed := lerpf(ARROW_SPEED_MIN, ARROW_SPEED_MAX, draw_charge)
+	var spawn_pos := camera.global_position - camera.global_basis.z * 0.45 + camera.global_basis.x * 0.06
+	var dir: Vector3
+	var perfect := false
+	# Tiro perfecto (D14 v2): soltar con la mira en la diana = solución
+	# balística exacta a la cabeza, sin spread. Ganado, no regalado.
+	if _aim_on_target and _locked_target != null and is_instance_valid(_locked_target):
+		var solution := _ballistic_dir(spawn_pos, _locked_target.head_position(), speed)
+		if solution != Vector3.ZERO:
+			dir = solution
+			perfect = true
+	if not perfect:
+		dir = _aim_dir_with_spread()
+
 	var arrow := Arrow.new()
 	get_tree().current_scene.add_child(arrow)
-	arrow.setup(
-		self,
-		camera.global_position + dir * 0.45 + camera.global_basis.x * 0.06,
-		dir * lerpf(ARROW_SPEED_MIN, ARROW_SPEED_MAX, draw_charge),
-		lerpf(ARROW_DAMAGE_MIN, ARROW_DAMAGE_MAX, draw_charge)
-	)
+	arrow.setup(self, spawn_pos, dir * speed,
+		lerpf(ARROW_DAMAGE_MIN, ARROW_DAMAGE_MAX, draw_charge), draw_charge, perfect)
 
 	AudioManager.play_ui("bow_shoot", -2.0)
 	_punch = -0.02 - draw_charge * 0.022  # view punch sutil (GDD §11.1)
 	bow.on_shoot()
 	_renock = RENOCK_TIME
 	draw_charge = 0.0
+	_aim_marker.hide_marker()
 
 
 func _cancel_draw() -> void:
@@ -338,10 +361,13 @@ func _update_camera_feel(delta: float) -> void:
 		camera.v_offset = 0.0
 
 
-## Distancia al enemigo bajo la mira (solo tensando: es cuando la escalera se ve).
+## Telémetro (pips) + diana Lucky Shot: solo tensando.
 func _update_aim_telemetry() -> void:
 	if not is_drawing:
 		aimed_enemy_distance = -1.0
+		_locked_target = null
+		_aim_on_target = false
+		_aim_marker.hide_marker()
 		return
 	var from := camera.global_position
 	var to := from - camera.global_basis.z * 60.0
@@ -349,6 +375,78 @@ func _update_aim_telemetry() -> void:
 	query.collide_with_areas = true
 	var hit := get_world_3d().direct_space_state.intersect_ray(query)
 	aimed_enemy_distance = from.distance_to(hit["position"]) if not hit.is_empty() else -1.0
+	_update_aim_marker()
+
+
+## La diana (D14 v2): sobre el objetivo del cono, elevada EXACTAMENTE lo que la
+## flecha cae a esa distancia con el draw actual — apuntarle a la diana pone la
+## flecha en la cabeza. Con la mira dentro, se enciende: soltar = tiro perfecto.
+func _update_aim_marker() -> void:
+	_locked_target = null
+	_aim_on_target = false
+	if draw_charge < LOCK_MIN_DRAW:
+		_aim_marker.hide_marker()
+		return
+	_locked_target = _find_target_in_cone()
+	if _locked_target == null:
+		_aim_marker.hide_marker()
+		return
+	var head: Vector3 = _locked_target.head_position()
+	var from := camera.global_position
+	var dist := from.distance_to(head)
+	var speed := lerpf(ARROW_SPEED_MIN, ARROW_SPEED_MAX, draw_charge)
+	var drop := Arrow.GRAVITY * dist * dist / (2.0 * speed * speed)
+	var marker_pos := head + Vector3.UP * (0.35 + drop)
+	# "Mira dentro de la diana": distancia del rayo de mira al centro, en mundo.
+	var forward := -camera.global_basis.z
+	var ray_dist := ((marker_pos - from).cross(forward)).length()
+	_aim_on_target = ray_dist < DIANA_RADIUS
+	_aim_marker.update_marker(marker_pos, _aim_on_target)
+
+
+func _find_target_in_cone() -> Node3D:
+	var from := camera.global_position
+	var forward := -camera.global_basis.z
+	var best: Node3D = null
+	var best_angle := deg_to_rad(LOCK_CONE_DEG)
+	var candidates := get_tree().get_nodes_in_group("enemies") \
+		+ get_tree().get_nodes_in_group("practice_targets")
+	for candidate in candidates:
+		if not candidate is Node3D or not candidate.has_method("head_position"):
+			continue
+		var head: Vector3 = candidate.head_position()
+		var offset: Vector3 = head - from
+		var dist := offset.length()
+		if dist > LOCK_RANGE or dist < 2.0:
+			continue
+		var angle := forward.angle_to(offset)
+		if angle >= best_angle:
+			continue
+		# Línea de visión: el mundo no debe tapar la cabeza.
+		var los := PhysicsRayQueryParameters3D.create(from, head, 1)
+		if get_world_3d().direct_space_state.intersect_ray(los).is_empty():
+			best_angle = angle
+			best = candidate
+	return best
+
+
+## Ángulo de lanzamiento exacto para llegar a `to` con velocidad `speed`
+## (trayectoria baja). ZERO si está fuera de alcance.
+func _ballistic_dir(from: Vector3, to: Vector3, speed: float) -> Vector3:
+	var delta := to - from
+	var dy := delta.y
+	var flat := Vector2(delta.x, delta.z)
+	var dx := flat.length()
+	if dx < 0.01:
+		return Vector3.ZERO
+	var g: float = Arrow.GRAVITY
+	var v2 := speed * speed
+	var disc := v2 * v2 - g * (g * dx * dx + 2.0 * dy * v2)
+	if disc < 0.0:
+		return Vector3.ZERO
+	var theta := atan((v2 - sqrt(disc)) / (g * dx))
+	var dir_flat := Vector3(flat.x, 0.0, flat.y).normalized()
+	return (dir_flat * cos(theta) + Vector3.UP * sin(theta)).normalized()
 
 
 # ------------------------------------------------------------------ interacción

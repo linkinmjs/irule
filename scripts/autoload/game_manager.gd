@@ -101,6 +101,8 @@ func _save_now() -> void:
 	var data := {
 		"day": WorldState.day,
 		"gold": WorldState.gold,
+		"xp": WorldState.xp,
+		"level": WorldState.level,
 	}
 	var door := get_tree().get_first_node_in_group("tower_door")
 	if door != null:

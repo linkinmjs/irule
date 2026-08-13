@@ -12,6 +12,8 @@ func _ready() -> void:
 		WorldState.reset()
 	else:
 		WorldState.reset(int(save.get("day", 1)), int(save.get("gold", 60)))
+		WorldState.xp = int(save.get("xp", 0))
+		WorldState.level = int(save.get("level", 1))
 
 	var level: Node3D
 	if ResourceLoader.exists(LEVEL_SCENE):

@@ -8,6 +8,9 @@ signal day_started(day: int)
 signal night_started(day: int)
 signal time_frozen
 signal gold_changed(gold: int)
+signal xp_gained(amount: int)
+signal xp_changed(xp: int, next_level_xp: int, level: int)
+signal level_up(level: int)
 
 enum Phase { DAY, DUSK, NIGHT, FROZEN }
 
@@ -24,6 +27,8 @@ var day := 1
 var hour := DAY_START_HOUR
 var phase: Phase = Phase.DAY
 var gold := 60
+var xp := 0
+var level := 1
 
 # Stats para el pergamino del amanecer (GDD §4.1).
 var kills_tonight := 0
@@ -104,6 +109,24 @@ func try_spend_gold(amount: int) -> bool:
 	return true
 
 
+## XP del arquero (D15): la otorgan las flechas al acertar y los kills.
+## En M4b los niveles alimentarán puntos de talento.
+func xp_for_next() -> int:
+	return 40 + (level - 1) * 25
+
+
+func add_xp(amount: int) -> void:
+	if amount <= 0:
+		return
+	xp += amount
+	xp_gained.emit(amount)
+	while xp >= xp_for_next():
+		xp -= xp_for_next()
+		level += 1
+		level_up.emit(level)
+	xp_changed.emit(xp, xp_for_next(), level)
+
+
 ## Llamado por GameManager al confirmar el despertar (GDD §4.1: dormir sella el día).
 func advance_day() -> void:
 	day += 1
@@ -123,6 +146,8 @@ func advance_day() -> void:
 func reset(starting_day := 1, starting_gold := 60) -> void:
 	day = starting_day
 	gold = starting_gold
+	xp = 0
+	level = 1
 	hour = DAY_START_HOUR
 	_last_hour_int = int(hour)
 	phase = Phase.DAY
@@ -165,6 +190,7 @@ func _on_enemy_killed(enemy: Node3D, headshot: bool) -> void:
 	if "bounty" in enemy:
 		bounty = enemy.bounty
 	add_gold(bounty + (5 if headshot else 0))
+	add_xp(8)  # kill bonus (D15) — el impacto ya pagó su XP
 
 
 func _on_door_damaged(_current: float, _maximum: float) -> void:

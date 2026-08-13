@@ -46,7 +46,8 @@ Registro de decisiones cerradas (para no re-discutirlas sin motivo):
 | D11 | Layout del nivel | Boceto de Mauri: camino curvo **hundido** para enemigos + **superficie superior** transitable por el jugador + torre de 2 pisos; la Puerta al final del camino | 2026-08-11 |
 | D12 | Post-proceso PS1 | Shader screen-space (aportado por Mauri): niebla por profundidad con ruido animado + cuantización + dithering — reemplaza al fog del Environment | 2026-08-11 |
 | D13 | **Solo Arquero** | No hay clases: el personaje ES arquero. Los talentos mejoran atributos de tiro o desbloquean tipos de flecha CRAFTEADOS (poción atada / plumas) con materiales farmeados en la isla (flores/hongos + caza de pájaros). Diseño: docs/design/m4b-solo-arquero.md | 2026-08-12 |
-| D14 | Balística v2 + guía de tiro | Gravedad de flecha unificada con el mundo (13.0), draw mínimo "globo" (14 m/s). Guía elegida: **escalera de pips** (holdovers 15/30/45 m en el crosshair + telémetro, visible cerca del full draw) + **memoria del tiro** (X de 2 s en cada impacto al mundo). docs/design/guia-de-tiro.md | 2026-08-12 |
+| D14 | Balística v2 + guía de tiro | Gravedad de flecha unificada con el mundo (13.0), draw mínimo "globo" (14 m/s). Guía: **escalera de pips** + **memoria del tiro** + **diana Lucky Shot** (v2): blanco flotante sobre el objetivo, elevado exactamente la caída — mira dentro = se enciende; soltar ahí = tiro perfecto (balística exacta a la cabeza, sin spread). Sin tensar, la flecha sale a cualquier lado (spread 7°) | 2026-08-12 |
+| D15 | Sistema de XP | Acertar flechas da XP: blanco (dummy 1.5 < goblin 4 + kill 8) × potencia del draw × distancia × calidad (headshot ×2, tiro perfecto ×1.5). Niveles con curva creciente — en M4b alimentan puntos de talento. Farmear tiro al blanco en tiempos muertos es progresión legítima | 2026-08-12 |
 
 ---
 

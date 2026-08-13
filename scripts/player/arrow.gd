@@ -17,13 +17,20 @@ var damage := 20.0
 var _shooter: Node3D
 var _life := 0.0
 var _visual: Node3D
+var _charge := 1.0
+var _perfect := false
+var _start_pos := Vector3.ZERO
 
 
-func setup(shooter: Node3D, from: Vector3, initial_velocity: Vector3, dmg: float) -> void:
+func setup(shooter: Node3D, from: Vector3, initial_velocity: Vector3, dmg: float,
+		charge := 1.0, perfect := false) -> void:
 	_shooter = shooter
 	global_position = from
+	_start_pos = from
 	velocity = initial_velocity
 	damage = dmg
+	_charge = charge
+	_perfect = perfect
 	_orient()
 
 
@@ -90,6 +97,7 @@ func _resolve(hit: Dictionary) -> void:
 
 	if target != null and target.has_method("take_arrow_hit"):
 		target.take_arrow_hit(damage, headshot, velocity.normalized(), hit["position"])
+		_grant_xp(target, headshot, hit["position"])
 		_stick_to(target)
 	else:
 		AudioManager.play_3d("arrow_hit_world", hit["position"], -8.0)
@@ -97,6 +105,27 @@ func _resolve(hit: Dictionary) -> void:
 		VFX.impact_marker(get_tree().current_scene, hit["position"], hit.get("normal", Vector3.UP))
 		_stick_to(target if target is Node3D else get_tree().current_scene)
 	queue_free()
+
+
+## XP por acierto (D15): blanco (dummy < goblin) × potencia del draw ×
+## distancia × calidad (headshot / tiro perfecto). Solo flechas del player.
+func _grant_xp(target: Node, headshot: bool, hit_pos: Vector3) -> void:
+	if not _shooter is Player:
+		return
+	var base := 0.0
+	if target.is_in_group("enemies"):
+		base = 4.0
+	elif target.is_in_group("practice_targets"):
+		base = 1.5
+	if base <= 0.0:
+		return
+	var dist := _start_pos.distance_to(hit_pos)
+	var xp := (base + dist / 8.0) * (0.5 + 0.5 * _charge)
+	if headshot:
+		xp *= 2.0
+	if _perfect:
+		xp *= 1.5
+	WorldState.add_xp(maxi(roundi(xp), 1))
 
 
 func _orient() -> void:

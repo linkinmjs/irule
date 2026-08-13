@@ -340,6 +340,11 @@ func take_explosion(damage: float, from: Vector3) -> void:
 		_knock += dir.normalized() * 4.0
 
 
+## Punto de la cabeza en mundo (la diana de apuntado y el tiro perfecto lo usan).
+func head_position() -> Vector3:
+	return global_position + Vector3.UP * 1.48 * _size_factor
+
+
 func retreat() -> void:
 	if _dying or state == State.RETREAT:
 		return

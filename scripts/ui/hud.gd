@@ -16,6 +16,10 @@ var _announce_label: Label
 var _door_bar: ProgressBar
 var _crosshair: CrosshairControl
 var _announce_tween: Tween
+var _level_label: Label
+var _xp_bar: ProgressBar
+var _xp_float: Label
+var _xp_float_tween: Tween
 
 
 func setup(player: Player) -> void:
@@ -41,7 +45,14 @@ func _ready() -> void:
 	GameManager.state_changed.connect(func(state: GameManager.State) -> void:
 		visible = state == GameManager.State.PLAYING)
 
+	WorldState.xp_gained.connect(_on_xp_gained)
+	WorldState.xp_changed.connect(_on_xp_changed)
+	WorldState.level_up.connect(func(new_level: int) -> void:
+		_announce("¡NIVEL %d!" % new_level)
+		AudioManager.play_ui("kill_bell", -8.0))
+
 	_on_gold_changed(WorldState.gold)
+	_on_xp_changed(WorldState.xp, WorldState.xp_for_next(), WorldState.level)
 	var door := get_tree().get_first_node_in_group("tower_door")
 	if door != null:
 		_on_door_changed(door.hp, TowerDoor.MAX_HP)
@@ -82,6 +93,24 @@ func _on_door_changed(current: float, maximum: float) -> void:
 
 func _on_prompt(text: String) -> void:
 	_prompt_label.text = text
+
+
+func _on_xp_changed(current_xp: int, next_level_xp: int, current_level: int) -> void:
+	_level_label.text = "NIV %d" % current_level
+	_xp_bar.max_value = next_level_xp
+	_xp_bar.value = current_xp
+
+
+## Floater "+N" al lado del crosshair: la recompensa se ve donde mirás (D15).
+func _on_xp_gained(amount: int) -> void:
+	_xp_float.text = "+%d" % amount
+	if _xp_float_tween != null and _xp_float_tween.is_running():
+		_xp_float_tween.kill()
+	_xp_float.position = Vector2(338, 168)
+	_xp_float.modulate.a = 1.0
+	_xp_float_tween = create_tween()
+	_xp_float_tween.tween_property(_xp_float, "position:y", 152.0, 0.55)
+	_xp_float_tween.parallel().tween_property(_xp_float, "modulate:a", 0.0, 0.55)
 
 
 func _on_wave_started(index: int, total: int) -> void:
@@ -134,6 +163,30 @@ func _build() -> void:
 	_hp_label.text = "VIDA 100"
 	_hp_label.position = Vector2(8, 334)
 	root.add_child(_hp_label)
+
+	_level_label = _label(11, Color(0.95, 0.85, 0.5))
+	_level_label.text = "NIV 1"
+	_level_label.position = Vector2(8, 314)
+	root.add_child(_level_label)
+
+	_xp_bar = ProgressBar.new()
+	_xp_bar.show_percentage = false
+	_xp_bar.position = Vector2(52, 320)
+	_xp_bar.size = Vector2(70, 6)
+	var xp_bg := StyleBoxFlat.new()
+	xp_bg.bg_color = Color(0.08, 0.07, 0.06, 0.85)
+	xp_bg.border_color = Color(0.4, 0.34, 0.24)
+	xp_bg.set_border_width_all(1)
+	var xp_fill := StyleBoxFlat.new()
+	xp_fill.bg_color = Color(0.85, 0.7, 0.3)
+	_xp_bar.add_theme_stylebox_override("background", xp_bg)
+	_xp_bar.add_theme_stylebox_override("fill", xp_fill)
+	root.add_child(_xp_bar)
+
+	_xp_float = _label(11, Color(0.95, 0.85, 0.5))
+	_xp_float.position = Vector2(338, 168)
+	_xp_float.modulate.a = 0.0
+	root.add_child(_xp_float)
 
 	_arrows_label = _label(14, Color(0.9, 0.87, 0.78))
 	_arrows_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT

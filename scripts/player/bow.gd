@@ -6,7 +6,10 @@ extends Node3D
 
 const MODEL_PATH := "res://assets/models/packs/weapons/bows/compositebow_01.fbx"
 const MODEL_TEXTURE := "res://assets/models/packs/weapons/bows/compositebow_tex.png"
-const MODEL_SCALE := 22.0
+## Alto objetivo del arco en mano (m). La escala se AUTOCALCULA midiendo el AABB
+## real del modelo y el pivot se recentra (el FBX venía con pivot desplazado:
+## escalarlo a ciegas lo mandaba arriba de la cámara — playtest 2026-08-12).
+const MODEL_TARGET_HEIGHT := 1.0
 ## Orientación del modelo en la mano (ajustar si el arco aparece girado).
 const MODEL_ROT := Vector3(0.0, PI * 0.5, PI * 0.5)
 
@@ -94,8 +97,31 @@ func _try_build_model() -> bool:
 		return false
 	var model := packed.instantiate() as Node3D
 	add_child(model)
+
+	# Medir el AABB real combinado (en espacio local del modelo) → escala
+	# exacta al alto objetivo, y recentrado del pivot al origen del wrapper.
+	var combined := AABB()
+	var first := true
+	for mi in AssetLib.meshes_in(model):
+		if mi.mesh == null:
+			continue
+		var inv := model.global_transform.affine_inverse()
+		var ab: AABB = (inv * mi.global_transform) * mi.get_aabb()
+		combined = ab if first else combined.merge(ab)
+		first = false
+	if first:
+		model.queue_free()
+		return false
+	var max_dim := maxf(combined.size.x, maxf(combined.size.y, combined.size.z))
+	if max_dim < 0.0001:
+		model.queue_free()
+		return false
+	var auto_scale := MODEL_TARGET_HEIGHT / max_dim
 	model.rotation = MODEL_ROT
-	model.scale = Vector3.ONE * MODEL_SCALE
+	model.scale = Vector3.ONE * auto_scale
+	# El centro del AABB (rotado y escalado) va al origen del viewmodel.
+	var center_offset := (Basis.from_euler(MODEL_ROT) * (combined.get_center() * auto_scale))
+	model.position = -center_offset
 	# La textura se asigna a mano (el png fue renombrado y el FBX no la enlaza).
 	var albedo: Texture2D = load(MODEL_TEXTURE) if ResourceLoader.exists(MODEL_TEXTURE) else null
 	for mi in AssetLib.meshes_in(model):

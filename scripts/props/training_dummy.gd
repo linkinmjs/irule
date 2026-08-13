@@ -6,6 +6,7 @@ var _wobble_tween: Tween
 
 
 func _ready() -> void:
+	add_to_group("practice_targets")  # la diana de apuntado también lo marca
 	collision_layer = 128
 	collision_mask = 0
 	_build_visual()
@@ -30,6 +31,11 @@ func _ready() -> void:
 	head_col.position = Vector3(0.0, 1.62, 0.0)
 	head_area.add_child(head_col)
 	add_child(head_area)
+
+
+## Punto de la cabeza en mundo (para la diana de apuntado).
+func head_position() -> Vector3:
+	return global_position + Vector3.UP * 1.62
 
 
 func take_arrow_hit(_damage: float, headshot: bool, dir: Vector3, _pos: Vector3) -> void:
