@@ -10,8 +10,10 @@ const MODEL_TEXTURE := "res://assets/models/packs/weapons/bows/compositebow_tex.
 ## real del modelo y el pivot se recentra (el FBX venía con pivot desplazado:
 ## escalarlo a ciegas lo mandaba arriba de la cámara — playtest 2026-08-12).
 const MODEL_TARGET_HEIGHT := 1.0
-## Orientación del modelo en la mano (ajustar si el arco aparece girado).
-const MODEL_ROT := Vector3(0.0, PI * 0.5, PI * 0.5)
+## Orientación del modelo en la mano: el FBX nativo vive acostado en su plano
+## XZ (largo en Z) — X=-90° lo para (Z→Y) y el yaw manda la curva hacia
+## adelante. Si la cuerda quedara del lado equivocado, invertir el yaw a -PI/2.
+const MODEL_ROT := Vector3(-PI * 0.5, PI * 0.5, 0.0)
 
 const REST_POS := Vector3(0.34, -0.3, -0.62)
 const DRAW_POS := Vector3(0.2, -0.26, -0.5)
