@@ -260,9 +260,10 @@ func _shoot() -> void:
 	var dir: Vector3
 	var perfect := false
 	# Tiro perfecto (D14 v2): soltar con la mira en la diana = solución
-	# balística exacta a la cabeza, sin spread. Ganado, no regalado.
+	# balística exacta a la cabeza FUTURA (con lead). Ganado, no regalado.
 	if _aim_on_target and _locked_target != null and is_instance_valid(_locked_target):
-		var solution := _ballistic_dir(spawn_pos, _locked_target.head_position(), speed)
+		var predicted := _predicted_head_position(_locked_target, spawn_pos, speed)
+		var solution := _ballistic_dir(spawn_pos, predicted, speed)
 		if solution != Vector3.ZERO:
 			dir = solution
 			perfect = true
@@ -378,9 +379,10 @@ func _update_aim_telemetry() -> void:
 	_update_aim_marker()
 
 
-## La diana (D14 v2): sobre el objetivo del cono, elevada EXACTAMENTE lo que la
-## flecha cae a esa distancia con el draw actual — apuntarle a la diana pone la
-## flecha en la cabeza. Con la mira dentro, se enciende: soltar = tiro perfecto.
+## La diana (D14 v2): sobre el punto FUTURO del objetivo (lead por tiempo de
+## vuelo — con goblins en movimiento la posición actual nunca acierta), elevada
+## EXACTAMENTE lo que la flecha cae con el draw actual. Anticipación + caída en
+## un solo punto: apuntarle a la diana pone la flecha en la cabeza.
 func _update_aim_marker() -> void:
 	_locked_target = null
 	_aim_on_target = false
@@ -391,17 +393,34 @@ func _update_aim_marker() -> void:
 	if _locked_target == null:
 		_aim_marker.hide_marker()
 		return
-	var head: Vector3 = _locked_target.head_position()
 	var from := camera.global_position
-	var dist := from.distance_to(head)
 	var speed := lerpf(ARROW_SPEED_MIN, ARROW_SPEED_MAX, draw_charge)
+	var predicted := _predicted_head_position(_locked_target, from, speed)
+	var dist := from.distance_to(predicted)
 	var drop := Arrow.GRAVITY * dist * dist / (2.0 * speed * speed)
-	var marker_pos := head + Vector3.UP * (0.35 + drop)
+	var marker_pos := predicted + Vector3.UP * (0.35 + drop)
 	# "Mira dentro de la diana": distancia del rayo de mira al centro, en mundo.
 	var forward := -camera.global_basis.z
 	var ray_dist := ((marker_pos - from).cross(forward)).length()
 	_aim_on_target = ray_dist < DIANA_RADIUS
 	_aim_marker.update_marker(marker_pos, _aim_on_target)
+
+
+## Cabeza del objetivo cuando la flecha LLEGUE (no donde está ahora): lead por
+## iteración de punto fijo — t = dist/velocidad, dos pasadas convergen de sobra.
+func _predicted_head_position(target: Node3D, from: Vector3, speed: float) -> Vector3:
+	var head: Vector3 = target.head_position()
+	var target_vel := Vector3.ZERO
+	if target is CharacterBody3D:
+		target_vel = (target as CharacterBody3D).velocity
+		target_vel.y = 0.0  # el bob vertical mete ruido; el lead útil es horizontal
+	if target_vel.length_squared() < 0.04:
+		return head
+	var predicted := head
+	for i in 2:
+		var t := from.distance_to(predicted) / maxf(speed, 1.0)
+		predicted = head + target_vel * t
+	return predicted
 
 
 func _find_target_in_cone() -> Node3D:
