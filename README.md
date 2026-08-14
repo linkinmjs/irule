@@ -26,11 +26,12 @@ Fuente pixel pendiente: extraer `assets/_raw/1Bit_UI_pack_byBatuhan.rar`
 |-------|--------|
 | WASD | Moverse (feel CS: frenada seca, counter-strafe) |
 | Click sostenido | Tensar el arco — soltar dispara. Quieto = preciso |
-| E | Interactuar (cama, reparar Puerta, reponer flechas) |
+| E | Interactuar (cama, reparar Puerta, reponer flechas, recoger flora) |
+| 1–5 | Cambiar flecha: normal · emplumada · incendiaria · congelante · explosiva |
 | Ctrl | Agacharse |
 | Espacio | Salto corto |
 | ESC | Pausa |
-| T | Mesa del Arquero (talentos) |
+| T | Mesa del Arquero (TALLER de flechas + talentos) |
 | **F1** | **Menú de debug**: spawns, iniciar ronda, saltar prep, respawn agua on/off, oro, Puerta, post on/off |
 
 ## El loop (D17: rondas)

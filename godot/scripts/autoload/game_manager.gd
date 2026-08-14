@@ -108,6 +108,7 @@ func _save_now() -> void:
 		"talents": Progression.talents.duplicate(),
 		"ammo": WorldState.ammo.duplicate(),
 		"shop_stock": WorldState.shop_stock.duplicate(),
+		"materials": WorldState.materials.duplicate(),
 	}
 	var door := get_tree().get_first_node_in_group("tower_door")
 	if door != null:

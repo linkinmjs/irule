@@ -29,6 +29,9 @@ func _ready() -> void:
 			WorldState.shop_stock.clear()
 			for key in saved_stock:
 				WorldState.shop_stock[StringName(key)] = int(saved_stock[key])
+		var saved_materials: Dictionary = save.get("materials", {})
+		for key in saved_materials:
+			WorldState.materials[StringName(key)] = int(saved_materials[key])
 		WorldState.xp = int(save.get("xp", 0))
 		WorldState.level = int(save.get("level", 1))
 
@@ -65,6 +68,10 @@ func _ready() -> void:
 	var events := RoundEvents.new()
 	events.name = "RoundEvents"
 	add_child(events)
+
+	var forage := ForageSystem.new()
+	forage.name = "ForageSystem"
+	add_child(forage)
 
 	var player := Player.new()
 	player.name = "Player"

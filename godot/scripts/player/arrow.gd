@@ -23,10 +23,12 @@ var _perfect := false
 var _start_pos := Vector3.ZERO
 var _gravity := GRAVITY
 var _headshot_bonus := 1.0
+var _type: ArrowTypeData = null  # null == normal (los NPC no pasan tipo)
 
 
 func setup(shooter: Node3D, from: Vector3, initial_velocity: Vector3, dmg: float,
-		charge := 1.0, perfect := false, gravity := GRAVITY, headshot_bonus := 1.0) -> void:
+		charge := 1.0, perfect := false, gravity := GRAVITY, headshot_bonus := 1.0,
+		type_id: StringName = &"normal") -> void:
 	_shooter = shooter
 	global_position = from
 	_start_pos = from
@@ -36,6 +38,7 @@ func setup(shooter: Node3D, from: Vector3, initial_velocity: Vector3, dmg: float
 	_perfect = perfect
 	_gravity = gravity
 	_headshot_bonus = headshot_bonus
+	_type = Catalog.arrow_type(type_id)
 	_orient()
 
 
@@ -60,7 +63,14 @@ func _ready() -> void:
 	fletch_mesh.size = Vector3(0.05, 0.05, 0.08)
 	fletch.position = Vector3(0.0, 0.0, 0.24)
 	fletch.mesh = fletch_mesh
-	fletch.material_override = PSXMaterials.cloth_red()
+	# El fletch lleva el color del tipo (lectura 1:1 material → flecha, M4b §2).
+	if _type != null and _type.id != &"normal":
+		var mat := StandardMaterial3D.new()
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.albedo_color = _type.tint
+		fletch.material_override = mat
+	else:
+		fletch.material_override = PSXMaterials.cloth_red()
 	_visual.add_child(fletch)
 
 
@@ -112,8 +122,42 @@ func _resolve(hit: Dictionary) -> void:
 		# Memoria del tiro (D14): solo los impactos al mundo — corregí desde ahí.
 		VFX.impact_marker(get_tree().current_scene, hit["position"], hit.get("normal", Vector3.UP))
 		_stick_to(target if target is Node3D else get_tree().current_scene)
+	_apply_special_effects(hit["position"])
 	_notify_allies_near(hit["position"], target)
 	queue_free()
+
+
+## Efectos de las flechas especiales al impactar (F4, M4b §2): AoE de la
+## explosiva y zonas de fuego/escarcha. El punto se proyecta al suelo para que
+## la zona quede a los pies aunque la flecha pegue en un cuerpo.
+func _apply_special_effects(hit_pos: Vector3) -> void:
+	if _type == null:
+		return
+	if _type.aoe_radius > 0.0:
+		AudioManager.play_3d("barrel_explode", hit_pos, 2.0)
+		VFX.dust_puff(get_tree().current_scene, hit_pos)
+		for enemy in get_tree().get_nodes_in_group("enemies"):
+			var enemy_3d := enemy as Node3D
+			if enemy_3d == null:
+				continue
+			if enemy_3d.global_position.distance_to(hit_pos) <= _type.aoe_radius \
+					and enemy.has_method("take_explosion"):
+				enemy.take_explosion(_type.aoe_damage, hit_pos)
+	if _type.zone != ArrowTypeData.ZoneEffect.NONE:
+		var ground := hit_pos
+		var query := PhysicsRayQueryParameters3D.create(
+			hit_pos + Vector3.UP * 0.5, hit_pos + Vector3.DOWN * 6.0, 1)
+		var floor_hit := get_world_3d().direct_space_state.intersect_ray(query)
+		if not floor_hit.is_empty():
+			ground = floor_hit["position"]
+		var zone := GroundZone.new()
+		zone.effect = _type.zone
+		zone.radius = _type.zone_radius
+		zone.duration = _type.zone_duration
+		zone.dps = _type.zone_dps
+		zone.slow = _type.zone_slow
+		get_tree().current_scene.add_child(zone)
+		zone.global_position = ground + Vector3.UP * 0.05
 
 
 ## Queja amplia del aliado (pedido 2026-08-13): un flechazo del player que cae

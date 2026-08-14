@@ -78,6 +78,8 @@ var _stuck_strikes := 0
 var _unstuck_until_ms := 0
 var _progress_check_pos := Vector3.ZERO
 var _progress_check_in := 4.0
+var _slow_factor := 1.0
+var _slow_until_ms := 0
 var _knock := Vector3.ZERO  # knockback acumulado — _on_velocity_computed pisaría velocity
 var _dying := false
 
@@ -225,6 +227,8 @@ func _navigate_towards(target: Vector3, delta: float) -> void:
 	dir.y = 0.0
 	dir = dir.normalized() if dir.length_squared() > 0.001 else Vector3.ZERO
 	var current_speed := speed * (0.35 if _stagger > 0.0 else 1.0)
+	if Time.get_ticks_msec() < _slow_until_ms:
+		current_speed *= _slow_factor
 	var desired := dir * current_speed
 
 	# Anti-atasco por VELOCIDAD (rápido, cubre el choque frontal contra algo):
@@ -366,13 +370,25 @@ func take_arrow_hit(damage: float, headshot: bool, dir: Vector3, _pos: Vector3) 
 		tween.tween_property(_visual, "rotation:x", 0.0, 0.18)
 
 
-func take_trap_damage(damage: float) -> void:
+## `stagger`: los pinchos frenan; la zona de fuego (tick 0.5 s) solo quema —
+## el freno es el rol de la congelante (M4b §2).
+func take_trap_damage(damage: float, stagger := true) -> void:
 	if _dying:
 		return
 	hp -= damage
-	_stagger = 0.45
+	if stagger:
+		_stagger = 0.45
 	if hp <= 0.0:
 		_die(false, Vector3.UP * 3.0, "torso")
+
+
+## Zona de escarcha (F4): multiplica la velocidad mientras esté adentro
+## (la zona re-aplica cada tick, así que expira solo al salir).
+func apply_slow(factor: float, duration: float) -> void:
+	if _dying:
+		return
+	_slow_factor = factor
+	_slow_until_ms = Time.get_ticks_msec() + int(duration * 1000.0)
 
 
 func take_explosion(damage: float, from: Vector3) -> void:

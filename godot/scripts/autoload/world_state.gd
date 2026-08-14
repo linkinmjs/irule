@@ -14,6 +14,7 @@ signal xp_gained(amount: int)
 signal xp_changed(xp: int, next_level_xp: int, level: int)
 signal level_up(level: int)
 signal ammo_changed(type: StringName, count: int)
+signal materials_changed(type: StringName, count: int)
 
 enum RoundPhase { PREP, ASSAULT, CLEARED }
 
@@ -37,6 +38,12 @@ var level := 1
 # Munición por tipo (F2/M4b): las normales se compran en el cajón (stock por ronda).
 var ammo: Dictionary = {&"normal": 30}
 var shop_stock: Dictionary = {}
+
+# Materiales del farming (F3/M4b §3): flor (ígnea), hongo (escarcha), pluma.
+var materials: Dictionary = {}
+
+## Cap de flechas especiales en el carcaj (M4b §2, knob de F7).
+const SPECIAL_ARROW_CAP := 10
 
 # Stats de la ronda en curso (para el pergamino del intermedio).
 var kills_this_round := 0
@@ -171,6 +178,50 @@ func try_spend_ammo(type: StringName, amount := 1) -> bool:
 	return true
 
 
+func material_count(type: StringName) -> int:
+	return int(materials.get(type, 0))
+
+
+func add_material(type: StringName, amount: int) -> void:
+	materials[type] = maxi(material_count(type) + amount, 0)
+	materials_changed.emit(type, materials[type])
+
+
+## Crafteo en la Mesa (F4, M4b §2): consume la receta (materiales + oro +
+## 1 flecha normal) y suma 1 del tipo. La receta la valida el Catalog; el
+## conocimiento (talento desbloqueado) lo valida la UI con Progression.
+func try_craft(arrow_id: StringName) -> bool:
+	var data := Catalog.arrow_type(arrow_id)
+	if data == null or data.recipe.is_empty():
+		return false
+	if ammo_count(arrow_id) >= SPECIAL_ARROW_CAP:
+		return false
+	# Verificar TODO antes de gastar NADA.
+	for ingredient in data.recipe:
+		var need := int(data.recipe[ingredient])
+		match ingredient:
+			&"oro":
+				if gold < need:
+					return false
+			&"normal":
+				if ammo_count(&"normal") < need:
+					return false
+			_:
+				if material_count(ingredient) < need:
+					return false
+	for ingredient in data.recipe:
+		var need := int(data.recipe[ingredient])
+		match ingredient:
+			&"oro":
+				try_spend_gold(need)
+			&"normal":
+				try_spend_ammo(&"normal", need)
+			_:
+				add_material(ingredient, -need)
+	add_ammo(arrow_id, 1)
+	return true
+
+
 ## Compra de un paquete en el cajón (solo tipos con bundle — la normal).
 func try_buy_ammo(type: StringName) -> bool:
 	var data := Catalog.arrow_type(type)
@@ -225,6 +276,7 @@ func reset(starting_round := 0, starting_gold := 60) -> void:
 	gold_earned_this_round = 0
 	door_damage_this_round = 0.0
 	ammo = {&"normal": 30}
+	materials = {}
 	_refresh_shop_stock()
 	ammo_changed.emit(&"normal", 30)
 

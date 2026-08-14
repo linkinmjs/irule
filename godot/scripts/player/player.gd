@@ -32,7 +32,14 @@ const INTERACT_RANGE := 3.2  # llega a la Puerta desde el borde de la meseta
 const STAND_HEIGHT := 1.8
 const CROUCH_HEIGHT := 1.2
 
-var selected_arrow: StringName = &"normal"  # el ciclado de tipos llega en F4
+signal arrow_selected(type_id: StringName)
+
+## Orden fijo de selección (teclas 1-5) — F4.
+const ARROW_SLOTS: Array[StringName] = [
+	&"normal", &"emplumada", &"incendiaria", &"congelante", &"explosiva",
+]
+
+var selected_arrow: StringName = &"normal"
 var draw_charge := 0.0
 var is_drawing := false
 
@@ -106,6 +113,37 @@ func _unhandled_input(event: InputEvent) -> void:
 		bow.add_sway(event.relative)
 	elif event.is_action_pressed("interact") and is_instance_valid(_interact_target):
 		_interact_target.interact(self)
+	elif event is InputEventKey and event.pressed and not event.echo:
+		var key := event as InputEventKey
+		var slot := key.physical_keycode - KEY_1
+		if slot >= 0 and slot < ARROW_SLOTS.size():
+			_select_arrow(ARROW_SLOTS[slot])
+
+
+## Cambio de flecha (F4): solo tipos que el arquero SABE hacer (talentos).
+func _select_arrow(type_id: StringName) -> void:
+	if type_id == selected_arrow:
+		return
+	if not type_id in Progression.unlocked_arrow_types():
+		AudioManager.play_ui("ui_click", -12.0)
+		return
+	if is_drawing:
+		_cancel_draw()
+	selected_arrow = type_id
+	arrow_selected.emit(type_id)
+	AudioManager.play_ui("ui_click", -8.0)
+
+
+## Gravedad efectiva del tipo seleccionado: la emplumada plancha la parábola,
+## la explosiva la hunde — la guía (pips + diana) usa SIEMPRE este valor.
+func effective_gravity() -> float:
+	var data := Catalog.arrow_type(selected_arrow)
+	return Progression.stats.gravity * (data.gravity_mult if data != null else 1.0)
+
+
+func _speed_mult() -> float:
+	var data := Catalog.arrow_type(selected_arrow)
+	return data.speed_mult if data != null else 1.0
 
 
 func _physics_process(delta: float) -> void:
@@ -245,7 +283,8 @@ func _shoot() -> void:
 		return
 
 	var stats := Progression.stats
-	var speed := lerpf(stats.arrow_speed_min, stats.arrow_speed_max, draw_charge)
+	var type_data := Catalog.arrow_type(selected_arrow)
+	var speed := lerpf(stats.arrow_speed_min, stats.arrow_speed_max, draw_charge) * _speed_mult()
 	var spawn_pos := camera.global_position - camera.global_basis.z * 0.45 + camera.global_basis.x * 0.06
 	var dir: Vector3
 	var perfect := false
@@ -260,11 +299,12 @@ func _shoot() -> void:
 	if not perfect:
 		dir = _aim_dir_with_spread()
 
+	var damage := lerpf(stats.arrow_damage_min, stats.arrow_damage_max, draw_charge) \
+		* (type_data.damage_mult if type_data != null else 1.0)
 	var arrow := Arrow.new()
 	get_tree().current_scene.add_child(arrow)
-	arrow.setup(self, spawn_pos, dir * speed,
-		lerpf(stats.arrow_damage_min, stats.arrow_damage_max, draw_charge),
-		draw_charge, perfect, stats.gravity, stats.headshot_bonus)
+	arrow.setup(self, spawn_pos, dir * speed, damage,
+		draw_charge, perfect, effective_gravity(), stats.headshot_bonus, selected_arrow)
 
 	AudioManager.play_ui("bow_shoot", -2.0)
 	_punch = -0.02 - draw_charge * 0.022  # view punch sutil (GDD §11.1)
@@ -386,10 +426,10 @@ func _update_aim_marker() -> void:
 		return
 	var from := camera.global_position
 	var stats := Progression.stats
-	var speed := lerpf(stats.arrow_speed_min, stats.arrow_speed_max, draw_charge)
+	var speed := lerpf(stats.arrow_speed_min, stats.arrow_speed_max, draw_charge) * _speed_mult()
 	var predicted := _predicted_head_position(_locked_target, from, speed)
 	var dist := from.distance_to(predicted)
-	var drop := stats.gravity * dist * dist / (2.0 * speed * speed)
+	var drop := effective_gravity() * dist * dist / (2.0 * speed * speed)
 	var marker_pos := predicted + Vector3.UP * (0.35 + drop)
 	# "Mira dentro de la diana": distancia del rayo de mira al centro, en mundo.
 	var forward := -camera.global_basis.z
@@ -450,7 +490,7 @@ func _ballistic_dir(from: Vector3, to: Vector3, speed: float) -> Vector3:
 	var dx := flat.length()
 	if dx < 0.01:
 		return Vector3.ZERO
-	var g: float = Progression.stats.gravity
+	var g := effective_gravity()
 	var v2 := speed * speed
 	var disc := v2 * v2 - g * (g * dx * dx + 2.0 * dy * v2)
 	if disc < 0.0:

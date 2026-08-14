@@ -47,6 +47,9 @@ func _ready() -> void:
 	GameManager.state_changed.connect(func(state: GameManager.State) -> void:
 		visible = state == GameManager.State.PLAYING)
 
+	if _player != null:
+		_player.arrow_selected.connect(_on_arrow_selected)
+
 	WorldState.xp_gained.connect(_on_xp_gained)
 	WorldState.xp_changed.connect(_on_xp_changed)
 	WorldState.level_up.connect(func(new_level: int) -> void:
@@ -83,16 +86,50 @@ func _process(_delta: float) -> void:
 
 # ------------------------------------------------------------------ señales
 
-func _on_ammo_changed(type: StringName, count: int) -> void:
-	if type != &"normal":
-		return  # los tipos especiales entran al HUD en F4
-	_arrows_label.text = "FLECHAS %d/%d" % [count, Progression.stats.quiver_max]
+func _on_ammo_changed(type: StringName, _count: int) -> void:
+	var selected: StringName = _player.selected_arrow if _player != null else &"normal"
+	if type != selected:
+		return
+	_refresh_arrows_label()
+
+
+## Cambio de flecha (F4): el label toma nombre/color del tipo y la escalera
+## de pips se recalcula con su gravedad/velocidad — cada tipo se VE distinto.
+func _on_arrow_selected(type_id: StringName) -> void:
+	var data := Catalog.arrow_type(type_id)
+	if data != null:
+		(_arrows_label.label_settings as LabelSettings).font_color = data.tint
+	_refresh_arrows_label()
+	_refresh_ballistics()
+
+
+func _refresh_arrows_label() -> void:
+	var selected: StringName = _player.selected_arrow if _player != null else &"normal"
+	if selected == &"normal":
+		_arrows_label.text = "FLECHAS %d/%d" % [
+			WorldState.ammo_count(&"normal"), Progression.stats.quiver_max]
+	else:
+		var data := Catalog.arrow_type(selected)
+		_arrows_label.text = "%s %d/%d" % [data.display_name.to_upper(),
+			WorldState.ammo_count(selected), WorldState.SPECIAL_ARROW_CAP]
+
+
+func _refresh_ballistics() -> void:
+	var stats := Progression.stats
+	var speed_mult := 1.0
+	var gravity_mult := 1.0
+	if _player != null:
+		var data := Catalog.arrow_type(_player.selected_arrow)
+		if data != null:
+			speed_mult = data.speed_mult
+			gravity_mult = data.gravity_mult
+	_crosshair.set_ballistics(stats.arrow_speed_max * speed_mult, stats.gravity * gravity_mult)
 
 
 ## Los talentos cambian balística y carcaj: la guía y el HUD se recalculan.
 func _on_stats_changed() -> void:
-	_crosshair.set_ballistics(Progression.stats.arrow_speed_max, Progression.stats.gravity)
-	_on_ammo_changed(&"normal", WorldState.ammo_count(&"normal"))
+	_refresh_ballistics()
+	_refresh_arrows_label()
 
 
 func _on_points_changed(points: int) -> void:
