@@ -162,6 +162,7 @@ func _apply_special_effects(hit_pos: Vector3) -> void:
 
 ## Queja amplia del aliado (pedido 2026-08-13): un flechazo del player que cae
 ## cerca suyo — en su isla o contra su torre — también cuenta como agresión.
+## Y los pájaros (F5) huyen del impacto: el tiro errado espanta la caza.
 func _notify_allies_near(hit_pos: Vector3, direct_target: Node) -> void:
 	if not _shooter is Player:
 		return
@@ -171,6 +172,12 @@ func _notify_allies_near(hit_pos: Vector3, direct_target: Node) -> void:
 		if (ally as Node3D).global_position.distance_to(hit_pos) < 7.0 \
 				and ally.has_method("take_arrow_hit"):
 			ally.take_arrow_hit(0.0, false, velocity.normalized(), hit_pos)
+	for bird in get_tree().get_nodes_in_group("birds"):
+		if bird == direct_target or not bird is Node3D:
+			continue
+		if (bird as Node3D).global_position.distance_to(hit_pos) < Bird.ARROW_SCARE_DIST \
+				and bird.has_method("scare"):
+			bird.scare(hit_pos)
 
 
 ## XP por acierto (D15): blanco (dummy < goblin) × potencia del draw ×

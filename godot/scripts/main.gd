@@ -73,6 +73,10 @@ func _ready() -> void:
 	forage.name = "ForageSystem"
 	add_child(forage)
 
+	var wildlife := WildlifeSystem.new()
+	wildlife.name = "WildlifeSystem"
+	add_child(wildlife)
+
 	var player := Player.new()
 	player.name = "Player"
 	add_child(player)

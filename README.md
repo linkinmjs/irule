@@ -45,6 +45,9 @@ puente o el balcón de la torre. Los barriles explotan al dispararles. Cae el
 último goblin → ronda superada. Si la Puerta llega a 0, el puesto cae.
 Cada 5 rondas es **especial**: la visita el mago Calcu ([E] para conversar —
 deja un regalo). El aliado Teru suelta una línea de trama por ronda.
+En el intermedio hay **pájaros**: bajan a comer de tu flora — cazalos de un
+flechazo (posados o comiendo; volando, dejalos ir) y juntá las **plumas**
+para la flecha emplumada. El cuerno del asalto los dispersa.
 
 ## Editar el nivel a mano
 
