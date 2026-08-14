@@ -76,6 +76,8 @@ var _growl_timer := 0.0
 var _stuck_time := 0.0
 var _stuck_strikes := 0
 var _unstuck_until_ms := 0
+var _progress_check_pos := Vector3.ZERO
+var _progress_check_in := 4.0
 var _knock := Vector3.ZERO  # knockback acumulado — _on_velocity_computed pisaría velocity
 var _dying := false
 
@@ -95,6 +97,7 @@ func configure(round_number: int, elite: bool) -> void:
 func set_target(door: Node3D) -> void:
 	_door = door
 	_spawn_position = global_position
+	_progress_check_pos = global_position
 	_attack_offset = Vector3(randf_range(-1.5, 1.5), 0.0, randf_range(0.0, 0.8))
 
 
@@ -131,6 +134,9 @@ func _ready() -> void:
 	_agent.target_desired_distance = 1.4
 	_agent.avoidance_enabled = true
 	_agent.max_speed = speed
+	# Prioridad aleatoria: rompe la simetría del RVO — en un pelotón denso,
+	# agentes idénticos se ceden el paso mutuamente y nadie avanza.
+	_agent.avoidance_priority = randf_range(0.2, 0.9)
 	add_child(_agent)
 	_agent.velocity_computed.connect(_on_velocity_computed)
 
@@ -221,28 +227,30 @@ func _navigate_towards(target: Vector3, delta: float) -> void:
 	var current_speed := speed * (0.35 if _stagger > 0.0 else 1.0)
 	var desired := dir * current_speed
 
-	# Anti-atasco escalado: 1º-2º strike, bypass del avoidance + empujón;
-	# 3º strike, RESCATE — snap al punto navegable más cercano (invisible en
-	# la práctica y garantiza progreso; playtest 2026-08-13: algunos quedaban
-	# clavados contra taludes/esquinas).
+	# Anti-atasco por VELOCIDAD (rápido, cubre el choque frontal contra algo):
+	# la velocidad baja acumula strikes. Insuficiente solo: un goblin oscilando
+	# por RVO o resbalando contra el talud tiene velocidad sin avanzar.
 	var real_hspeed := Vector2(velocity.x, velocity.z).length()
 	if desired.length() > 0.3 and real_hspeed < 0.25 and _stagger <= 0.0:
 		_stuck_time += delta
 		if _stuck_time > 0.7:
 			_stuck_time = 0.0
-			_stuck_strikes += 1
-			if _stuck_strikes >= 3:
-				_stuck_strikes = 0
-				var nav_map := get_world_3d().navigation_map
-				global_position = NavigationServer3D.map_get_closest_point(nav_map, global_position) \
-					+ Vector3.UP * 0.15
-			else:
-				_unstuck_until_ms = Time.get_ticks_msec() + 700
-				_knock += Vector3(randf_range(-1.0, 1.0), 0.0, randf_range(-1.0, 1.0)) * 0.9
+			_apply_stuck_strike()
 	else:
 		_stuck_time = maxf(_stuck_time - delta * 2.0, 0.0)
-		if real_hspeed > 0.6:
+
+	# Watchdog de PROGRESO (playtest 2026-08-14: pilas de goblins clavados en
+	# curvas del camino que el chequeo de velocidad nunca veía): posición cada
+	# 4 s — moverse < 1 m es atasco, tenga la velocidad que tenga. El progreso
+	# real es lo único que amnistía los strikes.
+	_progress_check_in -= delta
+	if _progress_check_in <= 0.0:
+		_progress_check_in = 4.0
+		if global_position.distance_to(_progress_check_pos) < 1.0:
+			_apply_stuck_strike()
+		else:
 			_stuck_strikes = 0
+		_progress_check_pos = global_position
 
 	var bypass_avoidance := Time.get_ticks_msec() < _unstuck_until_ms
 	if _agent.avoidance_enabled and not bypass_avoidance:
@@ -253,6 +261,32 @@ func _navigate_towards(target: Vector3, delta: float) -> void:
 		var target_yaw := atan2(-dir.x, -dir.z) + PI
 		rotation.y = lerp_angle(rotation.y, target_yaw, minf(delta * 6.0, 1.0))
 	_animate_march(delta, current_speed)
+
+
+## Escalada de rescate: 1º-2º strike, bypass del avoidance + empujón; 3º, snap
+## al punto navegable más cercano; 4º, teleport al próximo corner del path
+## (~3 m — invisible entre la niebla, y garantiza progreso sí o sí).
+func _apply_stuck_strike() -> void:
+	_stuck_strikes += 1
+	if _stuck_strikes <= 2:
+		_unstuck_until_ms = Time.get_ticks_msec() + 900
+		_knock += Vector3(randf_range(-1.0, 1.0), 0.0, randf_range(-1.0, 1.0)) * 1.2
+		return
+	var nav_map := get_world_3d().navigation_map
+	if _stuck_strikes == 3:
+		global_position = NavigationServer3D.map_get_closest_point(nav_map, global_position) \
+			+ Vector3.UP * 0.15
+		return
+	_stuck_strikes = 0
+	# Corner SIGUIENTE al actual: el actual suele estar en la misma zona que
+	# lo trabó (re-atasco en loop — corrida 2026-08-14).
+	var path := _agent.get_current_navigation_path()
+	var idx := _agent.get_current_navigation_path_index() + 1
+	if idx < path.size():
+		global_position = path[idx] + Vector3.UP * 0.15
+	else:
+		global_position = NavigationServer3D.map_get_closest_point(nav_map, global_position) \
+			+ Vector3.UP * 0.15
 
 
 func _on_velocity_computed(safe_velocity: Vector3) -> void:

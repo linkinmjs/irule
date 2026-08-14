@@ -49,7 +49,9 @@ func _launch_horde(total: int, elites: int) -> void:
 		for i in batch:
 			_spawn_goblin(spawned >= total - elites)
 			spawned += 1
-			await get_tree().create_timer(randf_range(0.7, 1.3), false).timeout
+			# Espaciados (playtest 2026-08-14): cada 0.7-1.3 s nacía un pelotón
+			# denso que se trababa solo en las curvas (deadlock RVO).
+			await get_tree().create_timer(randf_range(1.5, 2.4), false).timeout
 			if not is_inside_tree():
 				_active_batches -= 1
 				return

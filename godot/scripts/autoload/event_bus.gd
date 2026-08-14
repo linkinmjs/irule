@@ -51,7 +51,9 @@ func _ready() -> void:
 		print("[%s] ASALTO" % WorldState.round_tag()))
 	WorldState.round_cleared.connect(func(n: int) -> void:
 		print("[%s] RONDA %d SUPERADA" % [WorldState.round_tag(), n]))
-	# Posición del primer goblin cada 8 s: detecta atascos de navegación.
+	# Tracker de atascos cada 8 s: goblins que se movieron < 1 m entre muestras
+	# se reportan como STUCK con su posición — localiza pilas y deadlocks RVO.
+	var last_pos: Dictionary = {}
 	var tracker := Timer.new()
 	tracker.wait_time = 8.0
 	tracker.autostart = true
@@ -59,7 +61,25 @@ func _ready() -> void:
 	tracker.timeout.connect(func() -> void:
 		var enemies := get_tree().get_nodes_in_group("enemies")
 		if enemies.is_empty():
+			last_pos.clear()
 			return
-		var e := enemies[0] as Node3D
-		print("[%s] goblin0 pos=(%.1f, %.1f) vivos=%d" % [
-			WorldState.round_tag(), e.global_position.x, e.global_position.z, enemies.size()]))
+		var stuck: Array[String] = []
+		var seen: Dictionary = {}
+		for e in enemies:
+			var e3 := e as Node3D
+			var id := e3.get_instance_id()
+			seen[id] = true
+			var pos := e3.global_position
+			# state 1 == ATTACK: pegado a la Puerta se está quieto legítimamente.
+			if last_pos.has(id) and pos.distance_to(last_pos[id]) < 1.0 \
+					and int(e3.get("state")) != 1:
+				stuck.append("(%.0f,%.0f)" % [pos.x, pos.z])
+			last_pos[id] = pos
+		for id in last_pos.keys():
+			if not seen.has(id):
+				last_pos.erase(id)
+		var lead := enemies[0] as Node3D
+		print("[%s] vivos=%d lead=(%.0f,%.0f) stuck=%d %s" % [
+			WorldState.round_tag(), enemies.size(),
+			lead.global_position.x, lead.global_position.z,
+			stuck.size(), " ".join(stuck)]))
