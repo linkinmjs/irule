@@ -10,7 +10,16 @@ const RANGE := 30.0
 const DAMAGE := 24.0
 const ARROW_SPEED := 36.0
 
+const WARNINGS := [
+	"¡Ey! ¡Cuidado con eso!",
+	"¡Soy de tu lado, arquero!",
+	"¡Apuntale a los goblins!",
+	"¡La próxima te la devuelvo!",
+	"¡¿En serio?! ¡EY!",
+]
+
 var _cooldown := 0.0
+var _warn_cooldown := 0.0
 var _visual: Node3D
 
 
@@ -18,6 +27,37 @@ func _ready() -> void:
 	add_to_group("allies")
 	_cooldown = randf_range(0.5, 2.0)
 	_build_visual()
+	_build_hitbox()
+
+
+## Flechazo amigo (pedido 2026-08-13): el aliado se queja, no muere.
+func take_arrow_hit(_damage: float, _headshot: bool, _dir: Vector3, _pos: Vector3) -> void:
+	if Time.get_ticks_msec() < _warn_cooldown:
+		return
+	_warn_cooldown = Time.get_ticks_msec() + 3000
+	EventBus.announcement.emit(WARNINGS[randi() % WARNINGS.size()])
+	AudioManager.play_3d("goblin_growl", global_position, -6.0, 0.1, 1.7)  # gruñido indignado
+	# Se agacha un instante: el reproche también se ve.
+	var tween := create_tween()
+	tween.tween_property(_visual, "scale:y", 0.7, 0.1)
+	tween.tween_property(_visual, "scale:y", 1.0, 0.25)
+
+
+## Hitbox para que las flechas del player lo detecten (Area3D con redirect,
+## capa destructibles — mismo patrón que la cabeza del goblin).
+func _build_hitbox() -> void:
+	var area := Area3D.new()
+	area.collision_layer = 128
+	area.collision_mask = 0
+	area.monitoring = false
+	area.set_meta("redirect_to", self)
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(1.2, 1.9, 1.2)
+	var col := CollisionShape3D.new()
+	col.shape = shape
+	col.position = Vector3(0.0, 0.95, 0.0)
+	area.add_child(col)
+	add_child(area)
 
 
 func _physics_process(delta: float) -> void:

@@ -63,7 +63,10 @@ void fragment(){
 	vec4 view = INV_PROJECTION_MATRIX * vec4(ndc, 1.0);
 	view.xyz /= view.w;
 
-	float linear_depth = -view.z;
+	// Distancia RADIAL (no planar): la niebla forma una esfera alrededor de la
+	// cámara → horizonte curvo y los laterales del viewport ya no ven más
+	// lejos que el centro (pedido 2026-08-13).
+	float linear_depth = length(view.xyz);
 
 	float depth_mask_inv = clamp((linear_depth - (fog_distance - fog_fade_range)) / fog_fade_range, 0.0, 1.0);
 

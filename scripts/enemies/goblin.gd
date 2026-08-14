@@ -74,6 +74,7 @@ var _stagger := 0.0
 var _retreat_timer := 0.0
 var _growl_timer := 0.0
 var _stuck_time := 0.0
+var _stuck_strikes := 0
 var _unstuck_until_ms := 0
 var _knock := Vector3.ZERO  # knockback acumulado — _on_velocity_computed pisaría velocity
 var _dying := false
@@ -220,17 +221,28 @@ func _navigate_towards(target: Vector3, delta: float) -> void:
 	var current_speed := speed * (0.35 if _stagger > 0.0 else 1.0)
 	var desired := dir * current_speed
 
-	# Anti-atasco: si quiere avanzar pero está plantado (multitud + pared),
-	# puentea el avoidance un momento y se despega con un empujón lateral.
+	# Anti-atasco escalado: 1º-2º strike, bypass del avoidance + empujón;
+	# 3º strike, RESCATE — snap al punto navegable más cercano (invisible en
+	# la práctica y garantiza progreso; playtest 2026-08-13: algunos quedaban
+	# clavados contra taludes/esquinas).
 	var real_hspeed := Vector2(velocity.x, velocity.z).length()
 	if desired.length() > 0.3 and real_hspeed < 0.25 and _stagger <= 0.0:
 		_stuck_time += delta
 		if _stuck_time > 0.7:
 			_stuck_time = 0.0
-			_unstuck_until_ms = Time.get_ticks_msec() + 700
-			_knock += Vector3(randf_range(-1.0, 1.0), 0.0, randf_range(-1.0, 1.0)) * 0.9
+			_stuck_strikes += 1
+			if _stuck_strikes >= 3:
+				_stuck_strikes = 0
+				var nav_map := get_world_3d().navigation_map
+				global_position = NavigationServer3D.map_get_closest_point(nav_map, global_position) \
+					+ Vector3.UP * 0.15
+			else:
+				_unstuck_until_ms = Time.get_ticks_msec() + 700
+				_knock += Vector3(randf_range(-1.0, 1.0), 0.0, randf_range(-1.0, 1.0)) * 0.9
 	else:
 		_stuck_time = maxf(_stuck_time - delta * 2.0, 0.0)
+		if real_hspeed > 0.6:
+			_stuck_strikes = 0
 
 	var bypass_avoidance := Time.get_ticks_msec() < _unstuck_until_ms
 	if _agent.avoidance_enabled and not bypass_avoidance:

@@ -29,8 +29,10 @@ func _ready() -> void:
 
 	_mat = StandardMaterial3D.new()
 	_mat.albedo_texture = tex
-	_mat.albedo_color = Color(1.0, 1.0, 1.0, 0.88)
-	_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	# OPACA a propósito: transparente no escribía depth y el post nieblaba el
+	# agua con la profundidad del LECHO → parches del color del cielo
+	# ("cuadrado gris", playtest 2026-08-13). Opaca es además más PS1.
+	_mat.albedo_color = Color(1.0, 1.0, 1.0, 1.0)
 	_mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
 	_mat.roughness = 1.0
 	_mat.uv1_scale = Vector3(18.0, 18.0, 1.0)
