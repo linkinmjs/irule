@@ -49,7 +49,7 @@ func take_damage(amount: float) -> void:
 	if _destroyed:
 		return
 	hp = maxf(hp - amount, 0.0)
-	WorldState.door_damage_tonight += amount
+	WorldState.door_damage_this_round += amount
 	AudioManager.play_3d("door_hit", global_position + Vector3.UP * 1.5, -3.0)
 	EventBus.door_damaged.emit(hp, MAX_HP)
 	_update_stage()
@@ -77,13 +77,13 @@ func get_interact_prompt() -> String:
 		return ""
 	if hp >= MAX_HP:
 		return "La Puerta está firme"
-	if not WorldState.is_day():
-		return "Solo se puede reparar de día"
+	if WorldState.combat_active():
+		return "No durante el asalto"
 	return "[E] Reparar Puerta (%d oro · +%d)" % [REPAIR_COST, int(REPAIR_AMOUNT)]
 
 
 func interact(_player: Node) -> void:
-	if _destroyed or hp >= MAX_HP or not WorldState.is_day():
+	if _destroyed or hp >= MAX_HP or WorldState.combat_active():
 		return
 	if not WorldState.try_spend_gold(REPAIR_COST):
 		EventBus.announcement.emit("No te alcanza el oro")

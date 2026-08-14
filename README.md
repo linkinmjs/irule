@@ -1,6 +1,8 @@
-# Quest Defense (nombre placeholder)
+# Irulé
 
-Tower defense 3D en primera persona: **vos sos la torre**. Estética PS1 dungeon.
+Tower defense 3D en primera persona: **vos sos la torre** — el arquero Irulé.
+Estética PS1 dungeon. El juego avanza por **rondas** (D17): cada una con su
+cielo, su clima y una horda más grande.
 Diseño completo en [GDD.md](GDD.md) · assets en [assets-list.md](assets-list.md).
 
 ## Correr la maqueta
@@ -26,16 +28,20 @@ Fuente pixel pendiente: extraer `assets/_raw/1Bit_UI_pack_byBatuhan.rar`
 | Ctrl | Agacharse |
 | Espacio | Salto corto |
 | ESC | Pausa |
-| **F1** | **Menú de debug**: spawns, saltos de hora, oro, Puerta, reloj rápido, post on/off |
+| T | Mesa del Arquero (talentos) |
+| **F1** | **Menú de debug**: spawns, iniciar ronda, saltar prep, respawn agua on/off, oro, Puerta, post on/off |
 
-## El loop
+## El loop (D17: rondas)
 
-De día (08:00–20:00): reparar la Puerta, reponer flechas, prepararse.
-De noche (21:00–03:00): tres empujes de **goblins** (modelo animado del pack)
-marchan por el camino en S hundido hacia la Puerta — defendelos desde la
-superficie superior, el **istmo** entre los dos brazos del camino, o el balcón
-de la torre. Los barriles explotan al dispararles. A las **03:00 el tiempo se
-congela**: solo queda dormir (guarda partida). Si la Puerta llega a 0, el puesto cae.
+**Intermedio (CLEARED):** reparar la Puerta, reponer flechas, talentos, farmear
+tiro al blanco. La **cama** inicia la siguiente ronda (y guarda).
+**PREP (~10 s):** el cielo y el clima de la ronda entran en fundido; countdown.
+**ASALTO:** la horda completa (crece por ronda, élites al final) marcha por el
+camino en S entre las islas hacia la Puerta — defendela desde tu isla, el
+puente o el balcón de la torre. Los barriles explotan al dispararles. Cae el
+último goblin → ronda superada. Si la Puerta llega a 0, el puesto cae.
+Cada 5 rondas es **especial**: la visita el mago Calcu ([E] para conversar —
+deja un regalo). El aliado Teru suelta una línea de trama por ronda.
 
 ## Editar el nivel a mano
 
@@ -55,21 +61,21 @@ congela**: solo queda dormir (guarda partida). Si la Puerta llega a 0, el puesto
 
 | Flag | Efecto |
 |------|--------|
-| `--fast-clock` | Día a 0.5 s/hora y noche a 12 s/hora |
-| `--night-secs=N` | Noche a N segundos por hora (afina la duración a gusto) |
-| `--start-night` | Empieza a las 20:30 |
-| `--debug-log` | Log de spawns/golpes/posiciones en consola |
-| `--quit-at-freeze` | Cierra solo 8 s después de las 03:00 (tests headless) |
+| `--auto-rounds` | Encadena rondas solo (sin cama) — para tests headless |
+| `--skip-prep` | PREP de 0.5 s en vez de 10 |
+| `--quit-at-round=N` | Cierra al superar la ronda N (tests headless) |
+| `--debug-log` | Log de rondas/spawns/golpes/posiciones en consola |
 
 ## Estructura
 
 ```
 scenes/             main.tscn · levels/outpost_01.tscn (EDITABLE) · tools/bake_runner.tscn
-scripts/autoload/   EventBus · WorldState (reloj/fases) · AudioManager · SaveManager · GameManager
+scripts/autoload/   EventBus · WorldState (rondas D17) · Progression · AudioManager · SaveManager · GameManager
 scripts/player/     player.gd (movimiento CS + spread + footsteps) · bow.gd · arrow.gd
 scripts/enemies/    goblin.gd (FBX animado, 22 anims; fallback primitivas) · goblin_ragdoll.gd
+scripts/npc/        ally_archer.gd (Teru: dispara, se queja, trama) · wizard_visitor.gd (Calcu)
 scripts/props/      door_gate.gd (la Puerta) · powder_barrel · spike_trap · bed · arrow_crate · torch
-scripts/systems/    level_builder.gd (generador del nivel) · wave_spawner · day_night_visuals · retro_post_process
+scripts/systems/    level_builder.gd (generador del nivel) · wave_spawner · round_ambience · round_events · retro_post_process
 scripts/ui/         hud.gd · debug_menu.gd (F1) · summary_screen · game_over · pause
 scripts/lib/        psx_materials.gd · asset_lib.gd (piezas GLB → shader PSX) · vfx.gd
 scripts/tools/      bake_level_runner.gd · dump_scene_tree.gd · probe_goblin.gd

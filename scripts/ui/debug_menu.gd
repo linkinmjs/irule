@@ -1,13 +1,10 @@
 class_name DebugMenu
 extends CanvasLayer
-## Menú de debug (F1): spawns, saltos de hora, oro, Puerta, reloj rápido.
+## Menú de debug (F1): spawns, control de rondas, oro, Puerta, toggles.
 ## Con el menú abierto el mouse queda libre y el player no dispara
 ## (gatea por Input.mouse_mode).
 
 var _status_label: Label
-var _fast_clock := false
-var _saved_day_speed := 0.0
-var _saved_night_speed := 0.0
 
 
 func _ready() -> void:
@@ -47,9 +44,9 @@ func _process(_delta: float) -> void:
 	if not visible:
 		return
 	var enemies := get_tree().get_nodes_in_group("enemies").size()
-	_status_label.text = "FPS %d · Goblins %d · %s (día %d) · Oro %d" % [
+	_status_label.text = "FPS %d · Goblins %d · %s · Oro %d" % [
 		Engine.get_frames_per_second(), enemies,
-		WorldState.clock_text(), WorldState.day, WorldState.gold]
+		WorldState.round_tag(), WorldState.gold]
 
 
 # ------------------------------------------------------------------ acciones
@@ -66,7 +63,7 @@ func _spawn_goblins(count: int, elite: bool) -> void:
 			pos = (marker as Node3D).global_position
 	for i in count:
 		var goblin := Goblin.new()
-		goblin.configure(WorldState.day, elite)
+		goblin.configure(maxi(WorldState.round_number, 1), elite)
 		get_tree().current_scene.add_child(goblin)
 		goblin.global_position = pos + Vector3(randf_range(-1.6, 1.6), 0.05, randf_range(-1.2, 1.2))
 		goblin.set_target(door)
@@ -79,26 +76,23 @@ func _kill_all() -> void:
 			enemy.take_explosion(99999.0, enemy.global_position + Vector3(randf_range(-1, 1), 0, randf_range(-1, 1)))
 
 
-func _jump_to_night() -> void:
-	if WorldState.phase == WorldState.Phase.DAY or WorldState.phase == WorldState.Phase.DUSK:
-		WorldState.hour = 20.95
+func _start_round() -> void:
+	if WorldState.round_phase == WorldState.RoundPhase.CLEARED \
+			and GameManager.state == GameManager.State.PLAYING:
+		WorldState.start_round()
 
 
-func _jump_to_freeze() -> void:
-	if WorldState.phase != WorldState.Phase.FROZEN:
-		WorldState.hour = WorldState.FREEZE_HOUR - 0.01
+func _skip_prep() -> void:
+	if WorldState.round_phase == WorldState.RoundPhase.PREP:
+		WorldState.prep_remaining = 0.01
 
 
-func _toggle_fast_clock() -> void:
-	_fast_clock = not _fast_clock
-	if _fast_clock:
-		_saved_day_speed = WorldState.day_seconds_per_hour
-		_saved_night_speed = WorldState.night_seconds_per_hour
-		WorldState.day_seconds_per_hour = 1.0
-		WorldState.night_seconds_per_hour = 6.0
-	else:
-		WorldState.day_seconds_per_hour = _saved_day_speed
-		WorldState.night_seconds_per_hour = _saved_night_speed
+func _toggle_water_respawn() -> void:
+	var player := get_tree().get_first_node_in_group("player") as Player
+	if player != null:
+		player.water_respawn_enabled = not player.water_respawn_enabled
+		EventBus.announcement.emit("Respawn por agua: %s"
+			% ("ON" if player.water_respawn_enabled else "OFF"))
 
 
 func _toggle_post() -> void:
@@ -163,11 +157,9 @@ func _build() -> void:
 	_button(grid, "Spawn 5", func() -> void: _spawn_goblins(5, false))
 	_button(grid, "Spawn élite", func() -> void: _spawn_goblins(1, true))
 	_button(grid, "Matar todos", _kill_all)
-	_button(grid, "Noche 21:00", _jump_to_night)
-	_button(grid, "Congelar 03:00", _jump_to_freeze)
-	_button(grid, "Amanecer +1", func() -> void:
-		WorldState.advance_day())
-	_button(grid, "Reloj rápido", _toggle_fast_clock)
+	_button(grid, "Iniciar ronda", _start_round)
+	_button(grid, "Saltar prep", _skip_prep)
+	_button(grid, "Respawn agua", _toggle_water_respawn)
 	_button(grid, "+500 oro", func() -> void: WorldState.add_gold(500))
 	_button(grid, "Flechas full", func() -> void:
 		WorldState.add_ammo(&"normal", 999))

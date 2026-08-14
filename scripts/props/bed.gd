@@ -16,8 +16,10 @@ func _ready() -> void:
 
 func get_interact_prompt() -> String:
 	if GameManager.can_sleep():
-		return "[E] Dormir hasta el amanecer"
-	return "Los muertos todavía caminan…"
+		if WorldState.round_number == 0:
+			return "[E] Comenzar la Ronda 1"
+		return "[E] Descansar — Ronda %d" % (WorldState.round_number + 1)
+	return "No con enemigos en el mapa…"
 
 
 func interact(_player: Node) -> void:

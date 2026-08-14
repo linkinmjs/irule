@@ -1,7 +1,7 @@
 class_name RetroPostProcess
 extends MeshInstance3D
 ## Quad de pantalla completa con el post-proceso PS1 (shaders/psx_post.gdshader).
-## Vive como hijo de la cámara del player. DayNightVisuals lo encuentra por el
+## Vive como hijo de la cámara del player. RoundAmbience lo encuentra por el
 ## grupo "retro_post" y le actualiza la niebla según la hora.
 
 const SHADER := preload("res://shaders/psx_post.gdshader")

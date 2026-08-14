@@ -80,10 +80,10 @@ var _knock := Vector3.ZERO  # knockback acumulado — _on_velocity_computed pisa
 var _dying := false
 
 
-func configure(day: int, elite: bool) -> void:
+func configure(round_number: int, elite: bool) -> void:
 	is_elite = elite
-	var day_mult := 1.0 + (day - 1) * 0.18
-	max_hp = BASE_HP * day_mult * (2.4 if elite else 1.0)
+	var round_mult := 1.0 + (round_number - 1) * 0.18
+	max_hp = BASE_HP * round_mult * (2.4 if elite else 1.0)
 	hp = max_hp
 	# v3: camino ~190 m — más tranco para que el primer contacto no tarde tanto.
 	speed = (1.7 if elite else randf_range(1.85, 2.35))

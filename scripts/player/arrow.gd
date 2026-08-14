@@ -112,7 +112,21 @@ func _resolve(hit: Dictionary) -> void:
 		# Memoria del tiro (D14): solo los impactos al mundo — corregí desde ahí.
 		VFX.impact_marker(get_tree().current_scene, hit["position"], hit.get("normal", Vector3.UP))
 		_stick_to(target if target is Node3D else get_tree().current_scene)
+	_notify_allies_near(hit["position"], target)
 	queue_free()
+
+
+## Queja amplia del aliado (pedido 2026-08-13): un flechazo del player que cae
+## cerca suyo — en su isla o contra su torre — también cuenta como agresión.
+func _notify_allies_near(hit_pos: Vector3, direct_target: Node) -> void:
+	if not _shooter is Player:
+		return
+	for ally in get_tree().get_nodes_in_group("allies"):
+		if ally == direct_target or not ally is Node3D:
+			continue  # el impacto directo ya se quejó por take_arrow_hit
+		if (ally as Node3D).global_position.distance_to(hit_pos) < 7.0 \
+				and ally.has_method("take_arrow_hit"):
+			ally.take_arrow_hit(0.0, false, velocity.normalized(), hit_pos)
 
 
 ## XP por acierto (D15): blanco (dummy < goblin) × potencia del draw ×

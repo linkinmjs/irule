@@ -1,12 +1,11 @@
 class_name HUD
 extends CanvasLayer
-## HUD mínimo (GDD §10.2): vida, flechas, oro, reloj, vida de la Puerta. Nada más.
+## HUD mínimo (GDD §10.2): vida, flechas, oro, ronda, vida de la Puerta. Nada más.
 ## Crosshair dinámico: se abre con la velocidad — la lectura del spread CS (§5.1).
 
 var _player: Player
 
-var _day_label: Label
-var _clock_label: Label
+var _round_label: Label
 var _phase_label: Label
 var _hp_label: Label
 var _arrows_label: Label
@@ -41,10 +40,10 @@ func _ready() -> void:
 	EventBus.announcement.connect(_announce)
 	EventBus.arrow_hit.connect(_on_arrow_hit)
 	EventBus.wave_started.connect(_on_wave_started)
-	EventBus.night_cleared.connect(func() -> void: _announce("El corredor quedó en silencio…"))
-	WorldState.day_started.connect(func(day: int) -> void: _announce("DÍA %d" % day))
-	WorldState.night_started.connect(func(_day: int) -> void: _announce("¡LA HORDA AVANZA!"))
-	WorldState.time_frozen.connect(func() -> void: _announce("03:00 — EL TIEMPO SE CONGELÓ. La cama espera."))
+	WorldState.round_started.connect(func(n: int) -> void: _announce("RONDA %d" % n))
+	WorldState.assault_started.connect(func(_n: int) -> void: _announce("¡LA HORDA AVANZA!"))
+	WorldState.round_cleared.connect(func(_n: int) -> void:
+		_announce("Ronda superada. El corredor quedó en silencio…"))
 	GameManager.state_changed.connect(func(state: GameManager.State) -> void:
 		visible = state == GameManager.State.PLAYING)
 
@@ -64,17 +63,18 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	_clock_label.text = WorldState.clock_text()
-	_day_label.text = "DÍA %d" % WorldState.day
-	match WorldState.phase:
-		WorldState.Phase.DAY:
-			_phase_label.text = "Preparación"
-		WorldState.Phase.DUSK:
-			_phase_label.text = "Atardece…"
-		WorldState.Phase.NIGHT:
-			_phase_label.text = "¡Asedio!"
-		WorldState.Phase.FROZEN:
-			_phase_label.text = "El tiempo se congeló"
+	if WorldState.round_number == 0:
+		_round_label.text = "PUESTO IRULÉ"
+		_phase_label.text = "La cama inicia la Ronda 1"
+	else:
+		_round_label.text = "RONDA %d" % WorldState.round_number
+		match WorldState.round_phase:
+			WorldState.RoundPhase.PREP:
+				_phase_label.text = "Se acercan… %d" % ceili(WorldState.prep_remaining)
+			WorldState.RoundPhase.ASSAULT:
+				_phase_label.text = "¡Asedio!"
+			WorldState.RoundPhase.CLEARED:
+				_phase_label.text = "Intermedio — descansá para seguir"
 	if _player != null:
 		_crosshair.spread = _player.get_crosshair_spread()
 		_crosshair.draw_charge = _player.draw_charge if _player.is_drawing else 0.0
@@ -162,20 +162,16 @@ func _build() -> void:
 	_crosshair.set_ballistics(Progression.stats.arrow_speed_max, Progression.stats.gravity)
 	root.add_child(_crosshair)
 
-	_day_label = _label(13, Color(0.85, 0.8, 0.7))
-	_day_label.position = Vector2(8, 5)
-	root.add_child(_day_label)
-
-	_clock_label = _label(22, Color(0.95, 0.92, 0.85))
-	_clock_label.position = Vector2(8, 20)
-	root.add_child(_clock_label)
+	_round_label = _label(18, Color(0.95, 0.92, 0.85))
+	_round_label.position = Vector2(8, 8)
+	root.add_child(_round_label)
 
 	_phase_label = _label(11, Color(0.7, 0.66, 0.6))
-	_phase_label.position = Vector2(8, 48)
+	_phase_label.position = Vector2(8, 32)
 	root.add_child(_phase_label)
 
 	_talent_hint = _label(11, Color(0.95, 0.85, 0.5))
-	_talent_hint.position = Vector2(8, 66)
+	_talent_hint.position = Vector2(8, 50)
 	root.add_child(_talent_hint)
 
 	# Posiciones absolutas: el viewport es fijo 640×360 (stretch viewport).

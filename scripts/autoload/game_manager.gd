@@ -23,34 +23,38 @@ func is_gameplay() -> bool:
 	return state == State.PLAYING
 
 
-## GDD §4.1: se puede dormir en la congelación (03:00) o de día (la noche ya terminó).
+## D17: la cama solo funciona en el intermedio (sin horda en el mapa).
 func can_sleep() -> bool:
-	return WorldState.phase in [WorldState.Phase.FROZEN, WorldState.Phase.DAY]
+	return WorldState.round_phase == WorldState.RoundPhase.CLEARED
 
 
 func request_sleep() -> void:
 	if state != State.PLAYING or not can_sleep():
 		return
+	# Antes de la primera ronda no hay nada que resumir: arranca directo.
+	if WorldState.round_number == 0:
+		WorldState.start_round(1)
+		AudioManager.play_ui("ui_click", -6.0)
+		return
 	state = State.SUMMARY
-	get_tree().paused = true  # el mundo se detiene mientras dormís
+	get_tree().paused = true  # el mundo se detiene mientras descansás
 	state_changed.emit(state)
 	AudioManager.play_ui("ui_click", -6.0)
 
 
-## Botón "Despertar" del pergamino: sella el día y guarda (GDD §4.1).
+## Botón del pergamino: guarda y arranca la siguiente ronda (D17).
 func confirm_wake() -> void:
 	if state != State.SUMMARY:
 		return
-	# Puntos del amanecer (M4b): 1 + 1 extra si la Puerta terminó la noche
-	# intacta. Capturar ANTES de advance_day (que resetea las stats nocturnas).
-	var bonus := 1 + (1 if WorldState.door_damage_tonight <= 0.0 else 0)
-	WorldState.advance_day()
+	# Puntos por ronda superada (M4b): 1 + 1 extra si la Puerta quedó intacta.
+	var bonus := 1 + (1 if WorldState.door_damage_this_round <= 0.0 else 0)
 	Progression.grant_points(bonus)
 	EventBus.announcement.emit("+%d punto%s de talento — [T]" % [bonus, "" if bonus == 1 else "s"])
 	_save_now()
 	state = State.PLAYING
 	get_tree().paused = false
 	state_changed.emit(state)
+	WorldState.start_round()
 
 
 func toggle_pause() -> void:
@@ -95,8 +99,8 @@ func quit_game() -> void:
 ## Solo serializa (las reglas del amanecer viven en _apply_dawn_rules).
 func _save_now() -> void:
 	var data := {
-		"version": 3,
-		"day": WorldState.day,
+		"version": 4,
+		"round": WorldState.round_number,
 		"gold": WorldState.gold,
 		"xp": WorldState.xp,
 		"level": WorldState.level,

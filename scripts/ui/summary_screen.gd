@@ -26,19 +26,19 @@ func _fill() -> void:
 	for child in _content.get_children():
 		child.queue_free()
 
-	_add_line("— NOCHE %d SUPERADA —" % WorldState.day, 18, Color(0.92, 0.82, 0.55))
+	_add_line("— RONDA %d SUPERADA —" % WorldState.round_number, 18, Color(0.92, 0.82, 0.55))
 	_add_line("", 6, Color.WHITE)
-	_add_line("Bajas: %d" % WorldState.kills_tonight, 13, Color(0.88, 0.85, 0.78))
-	_add_line("Headshots: %d" % WorldState.headshots_tonight, 13, Color(0.88, 0.85, 0.78))
-	_add_line("Oro ganado: %d" % WorldState.gold_earned_today, 13, Color(0.95, 0.83, 0.4))
-	_add_line("Daño recibido por la Puerta: %d" % int(WorldState.door_damage_tonight), 13, Color(0.85, 0.6, 0.5))
+	_add_line("Bajas: %d" % WorldState.kills_this_round, 13, Color(0.88, 0.85, 0.78))
+	_add_line("Headshots: %d" % WorldState.headshots_this_round, 13, Color(0.88, 0.85, 0.78))
+	_add_line("Oro ganado: %d" % WorldState.gold_earned_this_round, 13, Color(0.95, 0.83, 0.4))
+	_add_line("Daño recibido por la Puerta: %d" % int(WorldState.door_damage_this_round), 13, Color(0.85, 0.6, 0.5))
 	var door := get_tree().get_first_node_in_group("tower_door")
 	if door != null:
 		_add_line("Puerta: %d/%d" % [int(door.hp), int(TowerDoor.MAX_HP)], 13, Color(0.8, 0.72, 0.6))
 	_add_line("", 6, Color.WHITE)
 
 	var wake := Button.new()
-	wake.text = "Despertar — Día %d" % (WorldState.day + 1)
+	wake.text = "A la Ronda %d" % (WorldState.round_number + 1)
 	wake.add_theme_font_size_override("font_size", 15)
 	wake.pressed.connect(func() -> void:
 		GameManager.confirm_wake()

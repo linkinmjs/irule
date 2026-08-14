@@ -1,109 +1,145 @@
 extends Node
-## Estado del mundo (GDD §4): reloj, fases del día, día actual, oro y stats nocturnas.
-## El tiempo interno usa horas 8.0..27.0 (27.0 == 03:00 del día siguiente, congelación).
+## Estado del mundo v3 (D17 "RONDAS"): el juego avanza por rondas, no por días.
+## CLEARED (intermedio libre: comprar, reparar, talentos, farmear) → la cama
+## inicia la siguiente → PREP (10 s de gracia con countdown) → ASSAULT (la
+## horda de la ronda) → al caer el último goblin, CLEARED de nuevo.
+## Cada ronda define sus características: ambiente/color, clima y horda
+## progresiva. XP, oro y munición también viven acá.
 
-signal hour_changed(clock_hour: int)
-signal phase_changed(phase: Phase)
-signal day_started(day: int)
-signal night_started(day: int)
-signal time_frozen
+signal round_started(round_number: int)    # entra PREP (características seteadas)
+signal assault_started(round_number: int)  # fin del countdown: spawns
+signal round_cleared(round_number: int)    # último goblin muerto
 signal gold_changed(gold: int)
 signal xp_gained(amount: int)
 signal xp_changed(xp: int, next_level_xp: int, level: int)
 signal level_up(level: int)
 signal ammo_changed(type: StringName, count: int)
 
-enum Phase { DAY, DUSK, NIGHT, FROZEN }
+enum RoundPhase { PREP, ASSAULT, CLEARED }
 
-const DAY_START_HOUR := 8.0
-const DUSK_HOUR := 20.0
-const NIGHT_HOUR := 21.0
-const FREEZE_HOUR := 27.0  # 03:00
+const PREP_SECONDS := 10.0  # knob: duración de la gracia inicial (a pulir)
 
-## Ritmo (GDD §14.1 — se afina jugando M3): día ~5 min, noche ~5.5 min.
-@export var day_seconds_per_hour := 25.0
-@export var night_seconds_per_hour := 55.0
+## Ambientes (color/hora ligados — D17) y climas posibles.
+const AMBIENCE_CYCLE: Array[StringName] = [
+	&"amanecer", &"mediodia", &"atardecer", &"anochecer", &"luna", &"noche_cerrada",
+]
+const WEATHERS: Array[StringName] = [&"despejado", &"neblina", &"bruma_roja"]
 
-var day := 1
-var hour := DAY_START_HOUR
-var phase: Phase = Phase.DAY
+var round_number := 0  # 0 = pre-juego (intermedio inicial, la cama inicia la 1)
+var round_phase: RoundPhase = RoundPhase.CLEARED
+var prep_remaining := 0.0
+var current_round: Dictionary = {}
+
 var gold := 60
 var xp := 0
 var level := 1
 
-# Munición por tipo (F2, M4b): recurso del mundo, no del player. Sin refill
-# gratis — las normales se COMPRAN en el cajón con stock diario.
+# Munición por tipo (F2/M4b): las normales se compran en el cajón (stock por ronda).
 var ammo: Dictionary = {&"normal": 30}
 var shop_stock: Dictionary = {}
 
-# Stats para el pergamino del amanecer (GDD §4.1).
-var kills_tonight := 0
-var headshots_tonight := 0
-var gold_earned_today := 0
-var door_damage_tonight := 0.0
+# Stats de la ronda en curso (para el pergamino del intermedio).
+var kills_this_round := 0
+var headshots_this_round := 0
+var gold_earned_this_round := 0
+var door_damage_this_round := 0.0
 
-var _last_hour_int := int(DAY_START_HOUR)
-var _default_day_sph := 25.0
-var _default_night_sph := 55.0
+var _auto_rounds := false
 
 
 func _ready() -> void:
 	EventBus.enemy_killed.connect(_on_enemy_killed)
-	EventBus.door_damaged.connect(_on_door_damaged)
-	# Flags de debug: `godot -- --fast-clock --start-night` (probar el ciclo sin esperar).
+	# Flags de debug/CI: --auto-rounds encadena rondas solo (headless),
+	# --skip-prep acorta la gracia a 0.5 s, --quit-at-round=N corta la corrida.
 	var args := OS.get_cmdline_user_args()
-	if args.has("--fast-clock"):
-		day_seconds_per_hour = 0.5
-		night_seconds_per_hour = 12.0
-	if args.has("--start-night"):
-		hour = 20.5
+	_auto_rounds = args.has("--auto-rounds")
+	if args.has("--skip-prep"):
+		prep_remaining = 0.0
+	var quit_at := 0
 	for arg in args:
-		if arg.begins_with("--night-secs="):
-			night_seconds_per_hour = float(arg.get_slice("=", 1))
-	# Los flags CLI definen los defaults de la sesión; reset() vuelve a ellos
-	# (el reloj rápido del DebugMenu no debe sobrevivir a "Nueva partida").
-	_default_day_sph = day_seconds_per_hour
-	_default_night_sph = night_seconds_per_hour
-	if args.has("--quit-at-freeze"):
-		time_frozen.connect(_debug_quit_after_freeze)
+		if arg.begins_with("--quit-at-round="):
+			quit_at = int(arg.get_slice("=", 1))
+	if quit_at > 0:
+		round_cleared.connect(func(n: int) -> void:
+			if n >= quit_at:
+				print("[ci] ronda %d superada — fin de la corrida" % n)
+				get_tree().quit())
+	if _auto_rounds:
+		round_cleared.connect(func(_n: int) -> void:
+			get_tree().create_timer(2.0, false).timeout.connect(func() -> void: start_round()))
+		get_tree().create_timer(2.0, false).timeout.connect(func() -> void:
+			if round_number == 0:
+				start_round())
 
 
-func _debug_quit_after_freeze() -> void:
-	await get_tree().create_timer(8.0).timeout
-	get_tree().quit()
+## Etiqueta corta para logs de debug: "R3·prep 7s" / "R3·asalto" / "R3·libre".
+func round_tag() -> String:
+	match round_phase:
+		RoundPhase.PREP:
+			return "R%d·prep %ds" % [round_number, ceili(prep_remaining)]
+		RoundPhase.ASSAULT:
+			return "R%d·asalto" % round_number
+		_:
+			return "R%d·libre" % round_number
 
 
 func _process(delta: float) -> void:
-	if phase == Phase.FROZEN or get_tree().paused:
+	if round_phase != RoundPhase.PREP or get_tree().paused:
 		return
-	var seconds_per_hour := day_seconds_per_hour if phase == Phase.DAY else night_seconds_per_hour
-	hour += delta / seconds_per_hour
-	_update_phase()
-	if int(hour) != _last_hour_int:
-		_last_hour_int = int(hour)
-		hour_changed.emit(clock_hour())
+	prep_remaining -= delta
+	if prep_remaining <= 0.0:
+		round_phase = RoundPhase.ASSAULT
+		assault_started.emit(round_number)
 
 
-func clock_hour() -> int:
-	return int(hour) % 24
+## Inicia la ronda `n` (o la siguiente): setea características y arranca PREP.
+func start_round(n := -1) -> void:
+	round_number = n if n > 0 else round_number + 1
+	current_round = round_info(round_number)
+	round_phase = RoundPhase.PREP
+	var args := OS.get_cmdline_user_args()
+	prep_remaining = 0.5 if args.has("--skip-prep") else PREP_SECONDS
+	kills_this_round = 0
+	headshots_this_round = 0
+	gold_earned_this_round = 0
+	door_damage_this_round = 0.0
+	_refresh_shop_stock()  # el cajón repone su stock cada ronda (las flechas NO)
+	round_started.emit(round_number)
 
 
-func clock_minute() -> int:
-	return int(fmod(hour, 1.0) * 60.0)
+## La llama el spawner cuando la horda fue derrotada.
+func clear_round() -> void:
+	if round_phase != RoundPhase.ASSAULT:
+		return
+	round_phase = RoundPhase.CLEARED
+	round_cleared.emit(round_number)
 
 
-func clock_text() -> String:
-	return "%02d:%02d" % [clock_hour(), clock_minute()]
+func combat_active() -> bool:
+	return round_phase == RoundPhase.ASSAULT
 
 
-func is_day() -> bool:
-	return phase == Phase.DAY
+## Características de la ronda (D17): deterministas por número.
+## `special` cada 5 rondas — el evento lo maneja RoundEvents (mago, etc.).
+func round_info(n: int) -> Dictionary:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7000 + n * 131
+	return {
+		"number": n,
+		"ambience": AMBIENCE_CYCLE[(n - 1) % AMBIENCE_CYCLE.size()],
+		"weather": WEATHERS[rng.randi() % WEATHERS.size()],
+		"enemy_count": 6 + n * 3,
+		"elites": maxi(n - 2, 0),
+		"special": n > 0 and n % 5 == 0,
+	}
 
+
+# ------------------------------------------------------------------ recursos
 
 func add_gold(amount: int) -> void:
 	gold += amount
 	if amount > 0:
-		gold_earned_today += amount
+		gold_earned_this_round += amount
 	gold_changed.emit(gold)
 
 
@@ -159,7 +195,6 @@ func _refresh_shop_stock() -> void:
 
 
 ## XP del arquero (D15): la otorgan las flechas al acertar y los kills.
-## En M4b los niveles alimentarán puntos de talento.
 func xp_for_next() -> int:
 	return 40 + (level - 1) * 25
 
@@ -176,76 +211,31 @@ func add_xp(amount: int) -> void:
 	xp_changed.emit(xp, xp_for_next(), level)
 
 
-## Llamado por GameManager al confirmar el despertar (GDD §4.1: dormir sella el día).
-func advance_day() -> void:
-	day += 1
-	hour = DAY_START_HOUR
-	_last_hour_int = int(hour)
-	kills_tonight = 0
-	headshots_tonight = 0
-	gold_earned_today = 0
-	door_damage_tonight = 0.0
-	_refresh_shop_stock()  # el cajón repone su STOCK — las flechas NO (F2)
-	phase = Phase.DAY
-	phase_changed.emit(phase)
-	day_started.emit(day)
-	hour_changed.emit(clock_hour())
-
-
-## Nueva partida (desde el menú de pausa o tras game over).
-func reset(starting_day := 1, starting_gold := 60) -> void:
-	day = starting_day
+## Nueva partida.
+func reset(starting_round := 0, starting_gold := 60) -> void:
+	round_number = starting_round
+	round_phase = RoundPhase.CLEARED
+	current_round = round_info(maxi(round_number, 1))
+	prep_remaining = 0.0
 	gold = starting_gold
 	xp = 0
 	level = 1
-	hour = DAY_START_HOUR
-	_last_hour_int = int(hour)
-	phase = Phase.DAY
-	kills_tonight = 0
-	headshots_tonight = 0
-	gold_earned_today = 0
-	door_damage_tonight = 0.0
-	day_seconds_per_hour = _default_day_sph
-	night_seconds_per_hour = _default_night_sph
+	kills_this_round = 0
+	headshots_this_round = 0
+	gold_earned_this_round = 0
+	door_damage_this_round = 0.0
 	ammo = {&"normal": 30}
 	_refresh_shop_stock()
 	ammo_changed.emit(&"normal", 30)
 
 
-func _update_phase() -> void:
-	var new_phase := phase
-	if hour >= FREEZE_HOUR:
-		hour = FREEZE_HOUR
-		new_phase = Phase.FROZEN
-	elif hour >= NIGHT_HOUR:
-		new_phase = Phase.NIGHT
-	elif hour >= DUSK_HOUR:
-		new_phase = Phase.DUSK
-	else:
-		new_phase = Phase.DAY
-	if new_phase == phase:
-		return
-	phase = new_phase
-	phase_changed.emit(phase)
-	match phase:
-		Phase.NIGHT:
-			night_started.emit(day)
-		Phase.FROZEN:
-			time_frozen.emit()
-
-
 func _on_enemy_killed(enemy: Node3D, headshot: bool) -> void:
-	kills_tonight += 1
+	kills_this_round += 1
 	if headshot:
-		headshots_tonight += 1
+		headshots_this_round += 1
 	# El botín lo define el enemigo (élites pagan más); el headshot suma un extra.
 	var bounty := 10
 	if "bounty" in enemy:
 		bounty = enemy.bounty
 	add_gold(bounty + (5 if headshot else 0))
 	add_xp(8)  # kill bonus (D15) — el impacto ya pagó su XP
-
-
-func _on_door_damaged(_current: float, _maximum: float) -> void:
-	# El monto exacto lo acumula la puerta; acá solo registramos que hubo daño.
-	pass

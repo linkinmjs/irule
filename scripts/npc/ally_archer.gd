@@ -18,6 +18,20 @@ const WARNINGS := [
 	"¡¿En serio?! ¡EY!",
 ]
 
+## Trama por ronda (pedido 2026-08-13): una línea al empezar cada ronda.
+## El aliado es la voz del mundo — cuenta qué pasa más allá del puesto.
+## Indexado por ronda; de ahí en adelante cicla las últimas genéricas.
+const LORE := [
+	"Teru: Vienen del bosque quemado. Antes ahí había un pueblo.",
+	"Teru: ¿Viste la bruma? No es niebla. Es lo que queda de los campos.",
+	"Teru: Dicen que un mago anda cruzando las islas. Cobra caro, pero ayuda.",
+	"Teru: El Portón lo construyó mi abuelo. No dejes que lo tiren.",
+	"Teru: Cada vez son más. Algo los está empujando hacia acá.",
+	"Teru: Anoche vi luces verdes tierra adentro. Eso no es fuego normal.",
+	"Teru: Si caemos nosotros, después siguen los puertos. Somos el tapón.",
+	"Teru: Guardá flechas. Esto recién empieza.",
+]
+
 var _cooldown := 0.0
 var _warn_cooldown := 0.0
 var _visual: Node3D
@@ -28,6 +42,18 @@ func _ready() -> void:
 	_cooldown = randf_range(0.5, 2.0)
 	_build_visual()
 	_build_hitbox()
+	WorldState.round_started.connect(_on_round_started)
+
+
+## La línea de trama entra unos segundos después del cartel "RONDA N",
+## para que no se pisen en el HUD.
+func _on_round_started(round_number: int) -> void:
+	var line: String = LORE[mini(round_number - 1, LORE.size() - 1)]
+	if round_number > LORE.size():
+		line = LORE[LORE.size() - 1 - (round_number % 3)]
+	get_tree().create_timer(3.5, false).timeout.connect(func() -> void:
+		if WorldState.round_number == round_number:
+			EventBus.announcement.emit(line))
 
 
 ## Flechazo amigo (pedido 2026-08-13): el aliado se queja, no muere.
@@ -44,7 +70,9 @@ func take_arrow_hit(_damage: float, _headshot: bool, _dir: Vector3, _pos: Vector
 
 
 ## Hitbox para que las flechas del player lo detecten (Area3D con redirect,
-## capa destructibles — mismo patrón que la cabeza del goblin).
+## capa destructibles — mismo patrón que la cabeza del goblin). El flechazo
+## "cerca" (isla/torre) lo detecta la propia flecha por distancia al impactar
+## (Arrow._notify_allies_near) — un Area3D grande frenaría flechas en el aire.
 func _build_hitbox() -> void:
 	var area := Area3D.new()
 	area.collision_layer = 128

@@ -1,13 +1,15 @@
-# Quest Defense — Game Design Document
+# Irulé — Game Design Document
 
-**Versión:** 0.2 · **Fecha:** 2026-08-11 · **Motor:** Godot 4.7 (Forward+, Jolt Physics)
+*(antes "Quest Defense" — renombrado 2026-08-13: Irulé es el nombre del arquero protagonista)*
+
+**Versión:** 0.3 · **Fecha:** 2026-08-13 · **Motor:** Godot 4.7 (Forward+, Jolt Physics)
 **Estado:** documento vivo — las secciones marcadas 🔶 son propuestas pendientes de validación.
 
 ---
 
 ## 1. Visión
 
-**Pitch:** Tower defense 3D en primera persona con estética de mazmorra PS1. Vos **sos** la torre: defendés tu corredor a disparos mientras negociás con los representantes de las otras torres del asedio. De noche peleás; de día reparás, mejorás, comerciás… y dormís para sellar el día.
+**Pitch:** Tower defense 3D en primera persona con estética de mazmorra PS1. Vos **sos** la torre: el arquero Irulé, defendiendo su corredor a disparos mientras negocia con los representantes de las otras torres del asedio. El juego avanza por **rondas** (D17): cada ronda trae su propio cielo, su clima y una horda más grande; entre rondas reparás, mejorás, comerciás… y descansás para llamar a la siguiente.
 
 **High concept:** *Orcs Must Die!* (TD en primera persona) + gunfeel y movimiento de *Counter-Strike* + presión horaria de *Dredge* + estética de *King's Field*.
 
@@ -21,7 +23,7 @@ Todo lo que entre al juego debe servir al menos a uno de estos pilares. Si los c
 
 1. **Vos sos la torre.** Poder posicional, nunca mano a mano. El jugador nunca pisa el corredor de los enemigos.
 2. **Gunfeel primero.** Movimiento y disparo crisp estilo CS: respuesta inmediata, feedback en capas. Si disparar no es rico, nada más importa.
-3. **La noche pesa.** El ciclo día/noche crea ritmo tensión/descanso. Dormir es un ritual, no un menú.
+3. **La ronda pesa.** El ciclo asalto/intermedio crea ritmo tensión/descanso (D17 supersede el día/noche: el mismo pilar, otro reloj). Descansar para llamar a la horda es un ritual, no un menú.
 4. **Nadie sobrevive solo.** Los pactos con las otras torres mueven recursos y rutas enemigas *de verdad* — la negociación tiene consecuencias mecánicas visibles.
 5. **PS1 tangible.** La estética no es un filtro encima: texturas low-res, vertex snapping, niebla densa y dithering construyen un mundo artesanal y opresivo. La niebla además sirve al gameplay (oculta el spawn).
 
@@ -48,37 +50,38 @@ Registro de decisiones cerradas (para no re-discutirlas sin motivo):
 | D13 | **Solo Arquero** | No hay clases: el personaje ES arquero. Los talentos mejoran atributos de tiro o desbloquean tipos de flecha CRAFTEADOS (poción atada / plumas) con materiales farmeados en la isla (flores/hongos + caza de pájaros). Diseño: docs/design/m4b-solo-arquero.md | 2026-08-12 |
 | D14 | Balística v2 + guía de tiro | Gravedad de flecha unificada con el mundo (13.0), draw mínimo "globo" (14 m/s). Guía: **escalera de pips** + **memoria del tiro** + **diana Lucky Shot** (v2): blanco flotante sobre el objetivo, elevado exactamente la caída — mira dentro = se enciende; soltar ahí = tiro perfecto (balística exacta a la cabeza, sin spread). Sin tensar, la flecha sale a cualquier lado (spread 7°) | 2026-08-12 |
 | D15 | Sistema de XP | Acertar flechas da XP: blanco (dummy 1.5 < goblin 4 + kill 8) × potencia del draw × distancia × calidad (headshot ×2, tiro perfecto ×1.5). Niveles con curva creciente — en M4b alimentan puntos de talento. Farmear tiro al blanco en tiempos muertos es progresión legítima | 2026-08-12 |
-| D16 | Sondas + asedio | El combate se distribuye: **sondas diurnas** chicas y anunciadas (11:00 y 16:00, 3-7 goblins sin élites — interrumpen el farmeo, dan oro/XP) + el **asedio nocturno** como pico (21:00, 23:00, 00:30 con élites). La noche conserva su identidad (pilar 3); el día deja de ser espera. Noche "luna de plata" + braseros + ojos de goblin para legibilidad | 2026-08-13 |
+| D16 | Sondas + asedio | El combate se distribuye: **sondas diurnas** chicas y anunciadas (11:00 y 16:00, 3-7 goblins sin élites — interrumpen el farmeo, dan oro/XP) + el **asedio nocturno** como pico (21:00, 23:00, 00:30 con élites). La noche conserva su identidad (pilar 3); el día deja de ser espera. Noche "luna de plata" + braseros + ojos de goblin para legibilidad. *(Superseded por D17 el mismo día: el reparto de tensión sobrevive, el reloj no.)* | 2026-08-13 |
+| D17 | **RONDAS** (supersede D16 y el ciclo día/noche) | No hay reloj: el juego avanza por **rondas**. Cada ronda define al iniciarse su **ambiente** (amanecer→mediodía→atardecer→anochecer→luna→noche cerrada, cíclico — color y hora ligados), su **clima** (despejado / neblina / bruma roja, determinista por seed) y su **horda** progresiva (6+3·n, élites desde la 3ª). Al iniciar: ~10 s de PREP con countdown → ASALTO (tandas de 8 cada 11 s, élites al final) → cae el último goblin → CLEARED (intermedio libre: comprar, reparar, talentos, farmeo). La cama inicia la siguiente. Cada 5 rondas es **especial**: pasa un evento (v1: el mago Calcu visita la isla, conversa y deja un regalo). El aliado Teru suelta una línea de trama por ronda. Dinamismo manteniendo el minimalismo | 2026-08-13 |
+| D18 | Nombre | El juego se llama **Irulé** — el nombre del arquero protagonista. Repo: github.com/linkinmjs/irule | 2026-08-13 |
 
 ---
 
 ## 4. Core loop
 
-### 4.1 Loop de un día (micro)
+### 4.1 Loop de una ronda (micro) — D17
 
 ```
- 08:00 AMANECER    Resumen de la noche (pergamino): botín, daños, bajas,
-                   mensajes de las otras torres.
- 08:00 DÍA         Reparar y mejorar la torre · comprar munición ·
- –20:00            elegir talentos · negociar con torres vecinas ·
-                   explorar zonas permitidas · colocar utilidades.
- 20:00 ATARDECER   Campana de aviso. Últimas decisiones. Se cierran
-                   las rutas exteriores.
- 21:00 NOCHE       Oleadas. Los enemigos avanzan por los corredores
- –03:00            hacia las Puertas. Defendés la tuya a disparos.
- 03:00 CONGELACIÓN El tiempo se detiene: los enemigos restantes se
-                   retiran entre la niebla. Única acción posible: la cama.
- 💤 DORMIR         Guarda la partida · resuelve pactos y simulación de
-                   torres NPC · aplica producción · pasa al día siguiente.
+ CLEARED    Intermedio sin reloj: reparar la Puerta · comprar munición ·
+ (libre)    elegir talentos · farmear tiro al blanco · explorar la isla.
+            El cajón repone stock por ronda. La CAMA llama a la siguiente.
+ 💤 CAMA    Pergamino de la ronda anterior (bajas, headshots, oro, daño a
+            la Puerta) · +1 punto de talento (+1 si la Puerta quedó
+            intacta) · guarda la partida · inicia la ronda N+1.
+ PREP       ~10 s de gracia con countdown. El cielo y el clima de la
+ (~10 s)    ronda ya entraron en fundido; el cuerno suena al final.
+ ASALTO     La horda completa de la ronda (6+3·n, élites al final desde
+            la 3ª) marcha hacia la Puerta. Defendés a disparos.
+ CLEARED    Cae el último goblin → ronda superada → intermedio de nuevo.
 ```
 
-- El reloj del día corre en tiempo real acelerado 🔶 (propuesta: ~12 min reales de día + 8–10 min de noche; a balancear en maqueta).
-- Dormir antes de las 03:00 está permitido si la noche terminó (bonus de descanso 🔶).
+- Cada ronda fija **ambiente** (color/hora ligados, ciclo de 6) y **clima** (determinista por seed) — el mundo cambia de cara sin reloj corriendo.
+- Cada 5 rondas es **especial**: un evento la distingue (v1: la visita del mago Calcu — llega en la PREP, [E] para conversar, deja un regalo y se disuelve).
+- El aliado Teru aporta una línea de trama al arrancar cada ronda: la historia entra por goteo, sin cutscenes.
 
 ### 4.2 Loop de asedio (macro)
 
-- Un mapa = un asedio de **7–10 días**, con **jefe la última noche**.
-- Dificultad y composición de oleadas escalan por día; después de medianoche aparecen variantes élite.
+- Un mapa = un asedio de **N rondas** (🔶 propuesta: 12–15), con **jefe en la última**.
+- Dificultad y composición de hordas escalan por ronda; los élites entran desde la 3ª y cierran cada horda.
 - Sobrevivís todos los días → asedio completado → **te ascienden** a un nuevo puesto de defensa más difícil: nuevo mapa, nuevas torres vecinas, nuevos personajes.
 - **Persiste todo entre puestos (D6):** clase, talentos y armas viajan con vos — tu defensor hace carrera. 🔶 Si oro/materiales también persisten se define junto con la economía (§14).
 - La clase se elige al crear al defensor; los talentos se acumulan a lo largo de la carrera (ver §7).

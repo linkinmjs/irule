@@ -12,7 +12,7 @@ func _ready() -> void:
 		WorldState.reset()
 		Progression.reset()
 	else:
-		WorldState.reset(int(save.get("day", 1)), int(save.get("gold", 60)))
+		WorldState.reset(int(save.get("round", 0)), int(save.get("gold", 60)))
 		WorldState.xp = int(save.get("xp", 0))
 		WorldState.level = int(save.get("level", 1))
 		Progression.from_dict({
@@ -58,9 +58,13 @@ func _ready() -> void:
 	elif level is LevelBuilder:
 		spawn_center = (level as LevelBuilder).spawn_center
 
-	var day_night := DayNightVisuals.new()
-	day_night.name = "DayNight"
-	add_child(day_night)
+	var ambience := RoundAmbience.new()
+	ambience.name = "RoundAmbience"
+	add_child(ambience)
+
+	var events := RoundEvents.new()
+	events.name = "RoundEvents"
+	add_child(events)
 
 	var player := Player.new()
 	player.name = "Player"

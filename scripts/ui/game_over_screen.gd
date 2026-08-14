@@ -49,7 +49,7 @@ func _build() -> void:
 	content.add_child(subtitle)
 	visibility_changed.connect(func() -> void:
 		if visible:
-			subtitle.text = "El puesto fue saqueado en el día %d" % WorldState.day)
+			subtitle.text = "El puesto cayó en la ronda %d" % WorldState.round_number)
 
 	var retry := Button.new()
 	retry.text = "Reintentar desde el amanecer"

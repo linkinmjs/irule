@@ -19,8 +19,6 @@ signal door_destroyed
 # --- Oleadas ---
 @warning_ignore("unused_signal")
 signal wave_started(wave_index: int, wave_count: int)
-@warning_ignore("unused_signal")
-signal night_cleared
 
 # --- Jugador / HUD ---
 # (la munición es estado del mundo: WorldState.ammo_changed — F2/M4b)
@@ -35,17 +33,24 @@ func _ready() -> void:
 	if not OS.get_cmdline_user_args().has("--debug-log"):
 		return
 	enemy_spawned.connect(func(enemy: Node3D) -> void:
-		print("[%s] spawn %s" % [WorldState.clock_text(), enemy.name]))
+		print("[%s] spawn %s" % [WorldState.round_tag(), enemy.name]))
 	enemy_killed.connect(func(_enemy: Node3D, headshot: bool) -> void:
-		print("[%s] kill (headshot=%s)" % [WorldState.clock_text(), headshot]))
+		print("[%s] kill (headshot=%s)" % [WorldState.round_tag(), headshot]))
 	wave_started.connect(func(index: int, total: int) -> void:
-		print("[%s] EMPUJE %d/%d" % [WorldState.clock_text(), index, total]))
+		print("[%s] EMPUJE %d/%d" % [WorldState.round_tag(), index, total]))
 	door_damaged.connect(func(current: float, maximum: float) -> void:
-		print("[%s] puerta %d/%d" % [WorldState.clock_text(), current, maximum]))
+		print("[%s] puerta %d/%d" % [WorldState.round_tag(), current, maximum]))
 	door_destroyed.connect(func() -> void:
-		print("[%s] PUERTA DESTRUIDA" % WorldState.clock_text()))
-	night_cleared.connect(func() -> void:
-		print("[%s] corredor limpio" % WorldState.clock_text()))
+		print("[%s] PUERTA DESTRUIDA" % WorldState.round_tag()))
+	WorldState.round_started.connect(func(n: int) -> void:
+		print("[%s] RONDA %d — %s / %s / %d enemigos" % [WorldState.round_tag(), n,
+			WorldState.current_round.get("ambience", &"?"),
+			WorldState.current_round.get("weather", &"?"),
+			WorldState.current_round.get("enemy_count", 0)]))
+	WorldState.assault_started.connect(func(_n: int) -> void:
+		print("[%s] ASALTO" % WorldState.round_tag()))
+	WorldState.round_cleared.connect(func(n: int) -> void:
+		print("[%s] RONDA %d SUPERADA" % [WorldState.round_tag(), n]))
 	# Posición del primer goblin cada 8 s: detecta atascos de navegación.
 	var tracker := Timer.new()
 	tracker.wait_time = 8.0
@@ -57,4 +62,4 @@ func _ready() -> void:
 			return
 		var e := enemies[0] as Node3D
 		print("[%s] goblin0 pos=(%.1f, %.1f) vivos=%d" % [
-			WorldState.clock_text(), e.global_position.x, e.global_position.z, enemies.size()]))
+			WorldState.round_tag(), e.global_position.x, e.global_position.z, enemies.size()]))
