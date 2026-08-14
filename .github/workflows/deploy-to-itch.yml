@@ -1,0 +1,74 @@
+name: Godot Export and Upload to Itch
+
+# Adaptado del template de la cátedra para Irulé:
+# - Godot 4.7 (el proyecto usa Forward+/Vulkan + Terrain3D: inviable en Web,
+#   se exporta "Windows Desktop" y se sube al channel `windows` de itch.io)
+# - checkout con LFS (los FBX/PNG/OGG del repo viven en Git LFS)
+# - el import usa el mismo binario oficial que el export (sin depender del
+#   tag del container barichello)
+
+on:
+  push:
+    branches: [master, main]
+  workflow_dispatch:
+
+env:
+  GODOT_VERSION: "4.7"
+  GODOT_STATUS: "stable"
+
+jobs:
+  export-game:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Cache imported assets
+        uses: actions/cache@v4
+        with:
+          path: godot/.godot/imported/
+          key: import-assets-${{ runner.os }}-${{ github.sha }}
+          restore-keys: import-assets-${{ runner.os }}-
+
+      - name: Download Godot for import pass
+        run: |
+          curl -sSL -o godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-${GODOT_STATUS}/Godot_v${GODOT_VERSION}-${GODOT_STATUS}_linux.x86_64.zip"
+          unzip -q godot.zip
+          chmod +x "Godot_v${GODOT_VERSION}-${GODOT_STATUS}_linux.x86_64"
+
+      - name: Import assets
+        run: |
+          "./Godot_v${GODOT_VERSION}-${GODOT_STATUS}_linux.x86_64" --headless --path godot --import || true
+
+      - name: Export Game using Godot
+        uses: firebelley/godot-export@v6.0.0
+        with:
+          godot_executable_download_url: "https://github.com/godotengine/godot/releases/download/${{ env.GODOT_VERSION }}-${{ env.GODOT_STATUS }}/Godot_v${{ env.GODOT_VERSION }}-${{ env.GODOT_STATUS }}_linux.x86_64.zip"
+          godot_export_templates_download_url: "https://github.com/godotengine/godot/releases/download/${{ env.GODOT_VERSION }}-${{ env.GODOT_STATUS }}/Godot_v${{ env.GODOT_VERSION }}-${{ env.GODOT_STATUS }}_export_templates.tpz"
+          relative_project_path: "./godot"
+          archive_output: true
+          presets_to_export: "Windows Desktop"
+          cache: false
+
+      - name: Upload Windows build
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: "/home/runner/.local/share/godot/archives/Windows Desktop.zip"
+
+  deploy-to-itchio:
+    runs-on: ubuntu-latest
+    needs: export-game
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows
+      - name: Deploy to Itch.io (Windows)
+        uses: manleydev/butler-publish-itchio-action@master
+        env:
+          BUTLER_CREDENTIALS: ${{ secrets.BUTLER_API_KEY }}
+          CHANNEL: windows
+          ITCH_GAME: ${{ secrets.ITCHIO_GAME }}
+          ITCH_USER: ${{ secrets.ITCHIO_USERNAME }}
+          PACKAGE: "Windows Desktop.zip"

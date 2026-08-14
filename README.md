@@ -5,9 +5,11 @@ Estética PS1 dungeon. El juego avanza por **rondas** (D17): cada una con su
 cielo, su clima y una horda más grande.
 Diseño completo en [GDD.md](GDD.md) · assets en [assets-list.md](assets-list.md).
 
+**El proyecto Godot vive en [godot/](godot/)** (layout del pipeline de CI).
+
 ## Correr la maqueta
 
-Abrir con **Godot 4.7** y dar Play (`F5`). Escena principal: `scenes/main.tscn`.
+Abrir `godot/` con **Godot 4.7** y dar Play (`F5`). Escena principal: `scenes/main.tscn`.
 El nivel jugable es **`scenes/levels/outpost_01.tscn`** (editable); si no existe,
 se genera por código con `LevelBuilder`.
 
@@ -66,7 +68,15 @@ deja un regalo). El aliado Teru suelta una línea de trama por ronda.
 | `--quit-at-round=N` | Cierra al superar la ronda N (tests headless) |
 | `--debug-log` | Log de rondas/spawns/golpes/posiciones en consola |
 
-## Estructura
+## Pipeline a itch.io
+
+Cada push a `master`/`main` dispara [.github/workflows/deploy-to-itch.yml](.github/workflows/deploy-to-itch.yml):
+importa assets con Godot 4.7, exporta el preset **Windows Desktop**
+(`godot/export_presets.cfg`) y lo sube con butler al channel `windows`.
+Secrets requeridos en el repo (ya configurados): `BUTLER_API_KEY`,
+`ITCHIO_GAME`, `ITCHIO_USERNAME`. Export Web inviable: Forward+/Vulkan + Terrain3D.
+
+## Estructura (dentro de godot/)
 
 ```
 scenes/             main.tscn · levels/outpost_01.tscn (EDITABLE) · tools/bake_runner.tscn
