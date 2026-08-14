@@ -10,3 +10,4 @@ scenes/levels/outpost_01_backup.tscn
 
 # Locks temporales de GDExtension (Godot corriendo con el DLL en uso)
 ~*.dll
+*.TMP
