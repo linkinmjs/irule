@@ -64,6 +64,9 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: windows
+      # butler usa $PACKAGE sin comillas: un nombre con espacio rompe el push.
+      - name: Rename package (no spaces)
+        run: mv "Windows Desktop.zip" irule-windows.zip
       - name: Deploy to Itch.io (Windows)
         uses: manleydev/butler-publish-itchio-action@master
         env:
@@ -71,4 +74,4 @@ jobs:
           CHANNEL: windows
           ITCH_GAME: ${{ secrets.ITCHIO_GAME }}
           ITCH_USER: ${{ secrets.ITCHIO_USERNAME }}
-          PACKAGE: "Windows Desktop.zip"
+          PACKAGE: irule-windows.zip
